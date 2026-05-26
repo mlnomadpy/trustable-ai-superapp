@@ -1,0 +1,12 @@
+{
+  "history_frames": 30,
+  "predict_frames": 20,
+  "frame_features": 8,
+  "context_features": 5,
+  "output_features": 3,
+  "train_sequences": 7543,
+  "val_sequences": 10964,
+  "test_sequences": 19828,
+  "train_passes": 421,
+  "track": "Sonoma Raceway"
+}

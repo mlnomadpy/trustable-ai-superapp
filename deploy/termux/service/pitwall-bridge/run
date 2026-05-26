@@ -1,0 +1,48 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Termux service entrypoint for pitwall_bridge.py.
+#
+# Managed by termux-services (sv). The runit supervisor:
+#   - Re-execs this script if the process dies
+#   - Captures stdout/stderr into ./log/run via svlogd
+#   - Honours `sv up | sv down | sv status pitwall-bridge`
+#
+# Install: see deploy/termux/INSTALL.md.
+
+# ── Wake lock — keep the CPU + radios alive when the screen is off. ────────
+# Without this, Android's Doze + App-Standby will quietly suspend the
+# Termux process within 5–15 minutes of the screen going dark, dropping
+# CAN ingestion mid-stint.
+termux-wake-lock
+
+# ── Repo + venv discovery ──────────────────────────────────────────────────
+# Adjust PITWALL_REPO if you cloned somewhere else.
+: "${PITWALL_REPO:=$HOME/pitwall}"
+: "${PITWALL_PORT:=8765}"
+: "${PITWALL_TRACK:=$PITWALL_REPO/data/tracks/sonoma.json}"
+
+# CAN config — leave CAN_CHANNEL empty to skip the reader (HTTP-only mode).
+: "${PITWALL_CAN_CHANNEL:=}"
+: "${PITWALL_CAN_INTERFACE:=slcan}"
+: "${PITWALL_CAN_BITRATE:=500000}"
+: "${PITWALL_CAN_DBC:=$PITWALL_REPO/data/dbc/pitwall.dbc}"
+
+cd "$PITWALL_REPO" || exit 1
+
+# Pin the Python that has flask + duckdb + python-can + cantools installed.
+PY="${PITWALL_PYTHON:-python3}"
+
+# Build the command line.
+set -- "$PY" tools/pitwall_bridge.py \
+    --track "$PITWALL_TRACK" \
+    --port "$PITWALL_PORT"
+
+if [ -n "$PITWALL_CAN_CHANNEL" ]; then
+    set -- "$@" \
+        --can-interface "$PITWALL_CAN_INTERFACE" \
+        --can-channel "$PITWALL_CAN_CHANNEL" \
+        --can-bitrate "$PITWALL_CAN_BITRATE" \
+        --can-dbc "$PITWALL_CAN_DBC"
+fi
+
+# exec — replace the shell, so signals (sv down) reach python directly.
+exec "$@" 2>&1

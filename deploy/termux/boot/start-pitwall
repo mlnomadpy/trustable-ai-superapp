@@ -1,0 +1,27 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Boot-time hook: brings up the pitwall service when the Pixel boots.
+#
+# Requires the Termux:Boot add-on (separate Play Store / F-Droid app).
+# Termux:Boot scans ~/.termux/boot/ on system boot and runs every script
+# it finds — that's all this file does.
+#
+# Place at $HOME/.termux/boot/start-pitwall (chmod +x).
+
+# Acquire wake lock before the supervisor starts so the very first frames
+# of the boot-up window aren't lost to early-boot Doze.
+termux-wake-lock
+
+# Start runit's process supervisor (sv-managed services in $PREFIX/var/service).
+# Idempotent — if it's already running this is a no-op.
+sv-enable pitwall-bridge >/dev/null 2>&1 || true
+sv up pitwall-bridge >/dev/null 2>&1 || true
+
+# Optional one-line system notification confirming boot.
+if command -v termux-notification >/dev/null 2>&1; then
+    termux-notification \
+        --id pitwall-bridge \
+        --title "pitwall bridge" \
+        --content "started on boot" \
+        --priority low \
+        --ongoing >/dev/null 2>&1 || true
+fi

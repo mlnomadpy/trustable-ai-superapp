@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pitwall · Telemetry Viewer</title>
+<style>
+  :root {
+    --bg: #0d0d12;
+    --bg2: #15151c;
+    --bg3: #1d1d27;
+    --fg: #e9e9f0;
+    --fg2: #9aa0b4;
+    --acc: #7cc5ff;
+    --ok: #7ee787;
+    --warn: #f0c674;
+    --bad: #f47174;
+    --grid: rgba(255,255,255,.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    overflow-y: scroll;
+  }
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--grid);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  header h1 span { color: var(--acc); }
+  header .file-input {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  header label.btn {
+    background: var(--bg3);
+    color: var(--fg);
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    border: 1px solid var(--grid);
+    transition: background .15s;
+  }
+  header label.btn:hover { background: #262635; }
+  header .status { color: var(--fg2); font-size: 13px; }
+  main { padding: 18px 24px 60px; max-width: 1500px; margin: 0 auto; }
+  .panels { display: grid; gap: 18px; }
+  .panel {
+    background: var(--bg2);
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid var(--grid);
+  }
+  .panel h2 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .stat { background: var(--bg3); padding: 12px; border-radius: 6px; }
+  .stat .v { font-size: 22px; font-weight: 600; color: var(--acc); }
+  .stat .l { font-size: 11px; color: var(--fg2); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .row { display: grid; gap: 18px; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 1100px) { .row-2, .row-3 { grid-template-columns: 1fr; } }
+  .chart-box { position: relative; height: 280px; }
+  .chart-box.tall { height: 360px; }
+  .tpms {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    max-width: 380px;
+    margin: 0 auto;
+  }
+  .corner {
+    background: var(--bg3);
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+  .corner .label { font-size: 11px; color: var(--fg2); text-transform: uppercase; letter-spacing: 0.08em; }
+  .corner .p { font-size: 22px; font-weight: 600; color: var(--acc); margin: 4px 0; }
+  .corner .t { font-size: 13px; color: var(--fg2); }
+  .corner .v { font-size: 11px; color: var(--fg2); }
+  .signal-picker { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .multi-picker { display: grid; grid-template-columns: 280px 1fr; gap: 14px; }
+  @media (max-width: 800px) { .multi-picker { grid-template-columns: 1fr; } }
+  .multi-picker .left { display: flex; flex-direction: column; gap: 8px; }
+  .multi-picker .left input[type="search"] { width: 100%; }
+  .multi-picker .left .sig-list {
+    background: var(--bg3);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    height: 360px;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .multi-picker .left .sig-list label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 8px; font-size: 12px;
+    border-radius: 4px; cursor: pointer;
+    color: var(--fg);
+  }
+  .multi-picker .left .sig-list label:hover { background: rgba(255,255,255,.04); }
+  .multi-picker .left .sig-list label.checked { background: rgba(124,197,255,.12); color: var(--acc); }
+  .multi-picker .left .sig-list label input { accent-color: var(--acc); }
+  .multi-picker .left .sig-list .group-head { color: var(--fg2); font-size: 10px; text-transform: uppercase; padding: 8px 6px 3px; letter-spacing: 0.08em; }
+  .multi-picker .left .sig-list .sig-meta { color: var(--fg2); font-size: 10px; margin-left: auto; }
+  .multi-picker .left .pick-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .multi-picker .left .pick-actions button { font-size: 11px; padding: 4px 8px; }
+  .quick-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .quick-presets button {
+    background: var(--bg3); color: var(--fg); border: 1px solid var(--grid);
+    padding: 5px 10px; font-size: 12px; border-radius: 5px; cursor: pointer;
+  }
+  .quick-presets button:hover { background: #262635; border-color: var(--acc); color: var(--acc); }
+  .quick-presets button.active { background: var(--acc); color: var(--bg); border-color: var(--acc); }
+  .chart-toolbar { display: flex; gap: 10px; font-size: 12px; color: var(--fg2); margin-bottom: 6px; }
+  .chart-toolbar button {
+    background: var(--bg3); color: var(--fg2); border: 1px solid var(--grid);
+    padding: 3px 9px; font-size: 11px; border-radius: 4px; cursor: pointer;
+  }
+  .chart-toolbar button:hover { color: var(--fg); }
+  select, input[type="text"], input[type="number"] {
+    background: var(--bg3);
+    color: var(--fg);
+    border: 1px solid var(--grid);
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  select { min-width: 200px; }
+  .legend-hint { color: var(--fg2); font-size: 12px; }
+  table.kv { border-collapse: collapse; width: 100%; }
+  table.kv td { padding: 4px 10px; border-bottom: 1px solid var(--grid); }
+  table.kv td.k { color: var(--fg2); }
+  table.kv td.v { text-align: right; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--fg2); padding: 40px; text-align: center; font-style: italic; }
+  .loader { color: var(--warn); font-size: 13px; }
+  .err { color: var(--bad); font-size: 13px; }
+  details { background: var(--bg3); border-radius: 6px; padding: 10px 14px; margin-top: 10px; }
+  details summary { cursor: pointer; color: var(--fg2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+  details pre { color: var(--fg); font-size: 12px; margin-top: 8px; overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>pitwall · <span>telemetry viewer</span></h1>
+  <div class="file-input">
+    <select id="recordings-picker" title="recordings discovered in .context/recordings/">
+      <option value="">(loading recordings…)</option>
+    </select>
+    <button class="btn" id="recordings-reload" title="re-scan .context/recordings/">↻</button>
+    <label class="btn">
+      <input type="file" id="file" accept=".sqlite,.db,.duckdb" style="display:none">
+      📂 or open file…
+    </label>
+    <select id="lap-picker" title="filter all charts to one lap" style="display:none"></select>
+    <label class="btn" style="display:flex;align-items:center;gap:6px;padding:6px 12px;cursor:pointer">
+      <input type="checkbox" id="filter-outliers" checked style="accent-color:var(--acc)">
+      filter outliers
+    </label>
+    <span id="status" class="status">discovering recordings…</span>
+  </div>
+</header>
+
+<main>
+  <div class="panels" id="panels">
+    <div class="panel empty" id="welcome">
+      Pick a recording from the drop-down above, drop a <code>.sqlite</code> file anywhere
+      on the page, or click <strong>open file…</strong>. Everything runs in-browser via
+      <code>sql.js</code> — no upload, no server-side processing.
+    </div>
+  </div>
+</main>
+
+<!-- sql.js (SQLite compiled to WebAssembly) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<!-- Chart.js v4 + zoom plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<!-- Leaflet for the track map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  .map-box { height: 480px; border-radius: 6px; overflow: hidden; background: #0a0a10; }
+  .leaflet-container { background: #0a0a10; }
+  .leaflet-control-attribution {
+    background: rgba(13,13,18,.6) !important;
+    color: var(--fg2) !important;
+    font-size: 10px !important;
+  }
+  .leaflet-control-attribution a { color: var(--acc) !important; }
+  .corner-marker {
+    background: #15151c;
+    color: var(--fg);
+    border: 1px solid var(--acc);
+    border-radius: 10px;
+    width: 20px; height: 20px;
+    text-align: center; font-size: 10px; line-height: 18px; font-weight: 600;
+  }
+  .map-legend { color: var(--fg2); font-size: 12px; margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .map-legend span.swatch { display: inline-block; width: 16px; height: 3px; vertical-align: middle; margin-right: 4px; }
+</style>
+
+<script>
+const STATUS = document.getElementById("status");
+const PANELS = document.getElementById("panels");
+const SQL_WASM_URL = "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.wasm";
+
+let DB = null;       // sql.js Database
+let CHARTS = [];     // tracked Chart instances so we can destroy on reload
+let LAPS = [];       // [{name, t_start, t_end, duration_s, distance_m, method}]
+let LAP_FILTER = null; // null = full session, else {t_start, t_end, name}
+let FILTER_OUTLIERS = true; // toggled via the header checkbox
+
+document.getElementById("filter-outliers").addEventListener("change", (e) => {
+  FILTER_OUTLIERS = e.target.checked;
+  if (DB) render();
+});
+
+// ─── plumbing ───────────────────────────────────────────────────────────
+function setStatus(s, klass = "") {
+  STATUS.textContent = s;
+  STATUS.className = "status " + klass;
+}
+
+async function loadFile(file) {
+  setStatus(`loading ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)...`, "loader");
+  try {
+    const SQL = await initSqlJs({ locateFile: () => SQL_WASM_URL });
+    const buf = await file.arrayBuffer();
+    DB = new SQL.Database(new Uint8Array(buf));
+    LAPS = []; LAP_FILTER = null;
+    setStatus(`${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`);
+    render();
+  } catch (e) {
+    setStatus("error: " + e.message, "err");
+    console.error(e);
+  }
+}
+
+document.getElementById("file").addEventListener("change", (ev) => {
+  if (ev.target.files[0]) loadFile(ev.target.files[0]);
+});
+// Drag-drop on the whole page
+document.body.addEventListener("dragover", (e) => { e.preventDefault(); });
+document.body.addEventListener("drop", (e) => {
+  e.preventDefault();
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+// ─── recordings directory listing ───────────────────────────────────────
+// Scrape Python http.server's directory index for .sqlite files. Works
+// when this page is served from the repo root; falls back gracefully
+// (file:// or other servers) by hiding the dropdown.
+const RECORDINGS_PATH = "/.context/recordings/";
+const PICKER = document.getElementById("recordings-picker");
+const RELOAD_BTN = document.getElementById("recordings-reload");
+
+async function discoverRecordings() {
+  PICKER.innerHTML = `<option value="">(loading…)</option>`;
+  setStatus("scanning .context/recordings/…", "loader");
+  let res;
+  try {
+    res = await fetch(RECORDINGS_PATH);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+  } catch (e) {
+    PICKER.innerHTML = `<option value="">(no server listing)</option>`;
+    PICKER.disabled = true;
+    setStatus("served from " + location.origin + " — directory listing unavailable, drop a file instead");
+    return;
+  }
+  const html = await res.text();
+  // Match Python's `<li><a href="filename.sqlite">filename.sqlite</a></li>`
+  const links = [...html.matchAll(/<a\s+href="([^"]+\.(?:sqlite|db|duckdb))"[^>]*>/gi)]
+                   .map((m) => decodeURIComponent(m[1]))
+                   .filter((n) => !n.startsWith("/"));
+  if (!links.length) {
+    PICKER.innerHTML = `<option value="">(no recordings found)</option>`;
+    setStatus("no .sqlite files in " + RECORDINGS_PATH);
+    return;
+  }
+  // For each, HEAD-fetch the size so we can show it. Parallelise.
+  const items = await Promise.all(links.map(async (name) => {
+    let size = 0, mtime = null;
+    try {
+      const h = await fetch(RECORDINGS_PATH + encodeURIComponent(name), { method: "HEAD" });
+      size  = parseInt(h.headers.get("content-length") || "0", 10);
+      mtime = h.headers.get("last-modified");
+    } catch {}
+    return { name, size, mtime };
+  }));
+  // Sort newest first by mtime if available, else by name desc
+  items.sort((a, b) => {
+    if (a.mtime && b.mtime) return new Date(b.mtime) - new Date(a.mtime);
+    return b.name.localeCompare(a.name);
+  });
+  PICKER.disabled = false;
+  PICKER.innerHTML =
+    `<option value="">— ${items.length} recording${items.length === 1 ? "" : "s"} —</option>` +
+    items.map((it) =>
+      `<option value="${it.name}">${it.name} · ${fmtBytes(it.size)}${it.mtime ? " · " + new Date(it.mtime).toLocaleString() : ""}</option>`
+    ).join("");
+  setStatus(`found ${items.length} recording${items.length === 1 ? "" : "s"} in ${RECORDINGS_PATH}`);
+}
+
+async function loadFromServer(name) {
+  setStatus(`loading ${name}…`, "loader");
+  try {
+    const res = await fetch(RECORDINGS_PATH + encodeURIComponent(name));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const buf = await res.arrayBuffer();
+    const SQL = await initSqlJs({ locateFile: () => SQL_WASM_URL });
+    DB = new SQL.Database(new Uint8Array(buf));
+    LAPS = []; LAP_FILTER = null;
+    setStatus(`${name} · ${fmtBytes(buf.byteLength)}`);
+    render();
+  } catch (e) {
+    setStatus("error loading " + name + ": " + e.message, "err");
+    console.error(e);
+  }
+}
+
+function fmtBytes(n) {
+  if (!n) return "0 B";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + " MB";
+  return (n / 1024 / 1024 / 1024).toFixed(2) + " GB";
+}
+
+PICKER.addEventListener("change", (ev) => {
+  if (ev.target.value) loadFromServer(ev.target.value);
+});
+RELOAD_BTN.addEventListener("click", discoverRecordings);
+// Run discovery once on load
+discoverRecordings();
+
+// ─── query helpers ──────────────────────────────────────────────────────
+function q(sql, params = []) {
+  const stmt = DB.prepare(sql);
+  if (params.length) stmt.bind(params);
+  const rows = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+function scalar(sql, params = []) {
+  const r = q(sql, params);
+  if (!r.length) return null;
+  return Object.values(r[0])[0];
+}
+
+// ─── lap detection ──────────────────────────────────────────────────────
+// Two strategies, tried in order:
+//
+//   1. GPS return-to-start: track the path from the first valid fix;
+//      whenever we return within R metres of any previously-visited
+//      start-line point AND at least MIN_LAP_S have elapsed AND we've
+//      travelled MIN_LAP_M cumulative metres, call that a lap boundary.
+//      Robust to any track shape, no track config required.
+//
+//   2. Speed-stint fallback: continuous segments where speed_ms > 2
+//      separated by ≥ 5 s of < 2 m/s. Each stint becomes one "lap".
+//      Useful when GPS has no fix (idle bench session).
+//
+// Always returns at least one entry: {name: "Full session", ...}.
+function detectLaps(sessionId) {
+  const out = [];
+  const sessTLo = scalar("SELECT MIN(timestamp) FROM telemetry WHERE session_id = ?", [sessionId]);
+  const sessTHi = scalar("SELECT MAX(timestamp) FROM telemetry WHERE session_id = ?", [sessionId]);
+  const sessDist = scalar("SELECT MAX(distance_m) - MIN(distance_m) FROM telemetry WHERE session_id = ?", [sessionId]) || 0;
+  if (sessTLo == null) return [];
+
+  out.push({ name: "Full session", t_start: sessTLo, t_end: sessTHi, duration_s: sessTHi - sessTLo, distance_m: sessDist, method: "all" });
+
+  // 1. GPS-based
+  const gps = q(`SELECT timestamp, lat, lon, distance_m FROM telemetry
+                 WHERE session_id = ?
+                   AND lat > -89 AND lat < 89
+                   AND lon BETWEEN -180 AND 180
+                   AND lat <> 0 AND lon <> 0 AND lon < 200
+                 ORDER BY timestamp`, [sessionId]);
+  if (gps.length > 200) {
+    const RADIUS_M = 30;            // crossing tolerance
+    const MIN_LAP_S = 30;
+    const MIN_LAP_M = 500;
+    const start = gps[0];
+    let curStart = start;
+    let curStartIdx = 0;
+    let leftStartZone = false;
+    let lapNum = 1;
+    const gpsLaps = [];
+    for (let i = 1; i < gps.length; i++) {
+      const d = haversine(curStart.lat, curStart.lon, gps[i].lat, gps[i].lon);
+      if (!leftStartZone && d > RADIUS_M * 2) leftStartZone = true;
+      const elapsed = gps[i].timestamp - curStart.timestamp;
+      const trav = (gps[i].distance_m || 0) - (curStart.distance_m || 0);
+      if (leftStartZone && d < RADIUS_M && elapsed >= MIN_LAP_S && trav >= MIN_LAP_M) {
+        gpsLaps.push({
+          name: `Lap ${lapNum++}`,
+          t_start: curStart.timestamp,
+          t_end: gps[i].timestamp,
+          duration_s: elapsed,
+          distance_m: trav,
+          method: "gps",
+        });
+        curStart = gps[i];
+        curStartIdx = i;
+        leftStartZone = false;
+      }
+    }
+    if (gpsLaps.length) {
+      out.push(...gpsLaps);
+      return out;
+    }
+  }
+
+  // 2. Distance-based laps — if cumulative distance ≥ 2× a known
+  //    track length (Sonoma ≈ 4060 m), slice into laps of that length.
+  //    Works when speed-derived distance is reliable but GPS isn't.
+  const totalDist = scalar("SELECT MAX(distance_m) - MIN(distance_m) FROM telemetry WHERE session_id = ?", [sessionId]) || 0;
+  const TRACK_LEN_M = 4060; // Sonoma — config option later
+  if (totalDist >= TRACK_LEN_M * 2) {
+    // Use speed-only stints to find driving segments, then partition each by track length
+    const rows = q(`SELECT timestamp, distance_m, speed_ms FROM telemetry
+                    WHERE session_id = ? AND distance_m IS NOT NULL ORDER BY timestamp`, [sessionId]);
+    let lapBoundary = null;
+    let lapStartT = null;
+    let lapNum = 1;
+    const distLaps = [];
+    for (const r of rows) {
+      if (r.speed_ms < 1) continue;
+      if (lapBoundary == null) { lapBoundary = r.distance_m + TRACK_LEN_M; lapStartT = r.timestamp; continue; }
+      if (r.distance_m >= lapBoundary) {
+        distLaps.push({
+          name: `Lap ${lapNum++}`, t_start: lapStartT, t_end: r.timestamp,
+          duration_s: r.timestamp - lapStartT, distance_m: TRACK_LEN_M, method: "distance",
+        });
+        lapStartT = r.timestamp;
+        lapBoundary += TRACK_LEN_M;
+      }
+    }
+    if (distLaps.length >= 2) {
+      out.push(...distLaps);
+      return out;
+    }
+  }
+
+  // 3. Speed-stint fallback
+  const speedRows = q(`SELECT timestamp, speed_ms FROM telemetry WHERE session_id = ? ORDER BY timestamp`, [sessionId]);
+  if (speedRows.length > 50) {
+    const MOVING = 2.0;             // m/s
+    const GAP_S  = 5.0;
+    const MIN_STINT_S = 20;
+    const stints = [];
+    let stintStart = null;
+    let lastMoveT = null;
+    for (const r of speedRows) {
+      if ((r.speed_ms || 0) > MOVING) {
+        if (stintStart === null) stintStart = r.timestamp;
+        lastMoveT = r.timestamp;
+      } else if (stintStart !== null && lastMoveT !== null && (r.timestamp - lastMoveT) > GAP_S) {
+        if (lastMoveT - stintStart >= MIN_STINT_S) stints.push({ t_start: stintStart, t_end: lastMoveT });
+        stintStart = null; lastMoveT = null;
+      }
+    }
+    if (stintStart !== null && lastMoveT !== null && lastMoveT - stintStart >= MIN_STINT_S) {
+      stints.push({ t_start: stintStart, t_end: lastMoveT });
+    }
+    stints.forEach((s, i) => out.push({
+      name: `Stint ${i + 1}`,
+      t_start: s.t_start, t_end: s.t_end,
+      duration_s: s.t_end - s.t_start,
+      distance_m: scalar("SELECT MAX(distance_m) - MIN(distance_m) FROM telemetry WHERE session_id = ? AND timestamp BETWEEN ? AND ?", [sessionId, s.t_start, s.t_end]) || 0,
+      method: "stint",
+    }));
+  }
+  return out;
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const dφ = (lat2 - lat1) * Math.PI / 180;
+  const dλ = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// SQL helpers that auto-apply the lap filter. `col` is the timestamp
+// column to filter on ('timestamp' for telemetry, 't' for
+// telemetry_signals). Returns "" + [] when no filter is active.
+function lapWhere(col) {
+  if (!LAP_FILTER) return { sql: "", params: [] };
+  return { sql: ` AND ${col} BETWEEN ? AND ?`, params: [LAP_FILTER.t_start, LAP_FILTER.t_end] };
+}
+function lapWhereInitial(col) {
+  if (!LAP_FILTER) return { sql: "", params: [] };
+  return { sql: ` WHERE ${col} BETWEEN ? AND ?`, params: [LAP_FILTER.t_start, LAP_FILTER.t_end] };
+}
+
+const LAP_PICKER = document.getElementById("lap-picker");
+LAP_PICKER.addEventListener("change", () => {
+  const i = parseInt(LAP_PICKER.value, 10);
+  LAP_FILTER = (i === 0 || isNaN(i)) ? null : LAPS[i];
+  // Re-render everything with the new filter
+  if (DB) render();
+});
+
+function renderLapPicker() {
+  LAP_PICKER.innerHTML = LAPS.map((lap, i) => {
+    const tag = lap.method === "gps" ? "" : lap.method === "stint" ? " · stint" : "";
+    return `<option value="${i}">${lap.name}${tag} · ${fmtDur(lap.duration_s)}${lap.distance_m > 50 ? " · " + (lap.distance_m / 1000).toFixed(2) + " km" : ""}</option>`;
+  }).join("");
+  LAP_PICKER.style.display = LAPS.length ? "" : "none";
+  if (LAP_FILTER) {
+    // try to preserve current selection by name
+    const idx = LAPS.findIndex((l) => l.name === LAP_FILTER.name);
+    LAP_PICKER.value = idx >= 0 ? idx : 0;
+    LAP_FILTER = idx >= 0 ? LAPS[idx] : null;
+  } else {
+    LAP_PICKER.value = "0";
+  }
+}
+
+// ─── render ─────────────────────────────────────────────────────────────
+function render() {
+  CHARTS.forEach((c) => c.destroy());
+  CHARTS = [];
+  PANELS.innerHTML = "";
+
+  // Detect laps once per DB load (cheap on already-loaded data)
+  if (!LAPS.length || LAPS[0].sid !== currentSessionId()) {
+    LAPS = detectLaps(currentSessionId());
+    renderLapPicker();
+  }
+
+  // 1. Summary
+  renderSummary();
+  // 2. Track map (Sonoma centerline + recorded position)
+  renderTrackMap();
+  // 3. Wide-canonical time series (speed/rpm/brake/throttle/g)
+  renderWideSeries();
+  // 4. TPMS panel
+  renderTpms();
+  // 5. IMU panel (accel + gyro)
+  renderImu();
+  // 6. Stock comparison panels (engine temps, pressures, TPMS, wheel speeds)
+  renderStockComparisons();
+  // 7. Multi-signal overlay picker with twin axes + zoom
+  renderPicker();
+  // 8. Schema / table inventory (collapsed)
+  renderSchema();
+}
+
+function currentSessionId() {
+  return scalar("SELECT session_id FROM sessions ORDER BY started_at DESC LIMIT 1") || "_live";
+}
+
+function panel(title, contentHtml = "") {
+  const p = document.createElement("div");
+  p.className = "panel";
+  p.innerHTML = `<h2>${title}</h2>${contentHtml}`;
+  PANELS.appendChild(p);
+  return p;
+}
+
+// ─── summary ────────────────────────────────────────────────────────────
+function renderSummary() {
+  const sessionId = currentSessionId();
+  const lf = lapWhere("timestamp");
+  const lfT = lapWhere("t");
+  const wideN     = scalar("SELECT COUNT(*) FROM telemetry WHERE session_id = ?" + lf.sql, [sessionId, ...lf.params]) || 0;
+  const tallN     = scalar("SELECT COUNT(*) FROM telemetry_signals WHERE session_id = ?" + lfT.sql, [sessionId, ...lfT.params]) || 0;
+  const tlo       = scalar("SELECT MIN(timestamp) FROM telemetry WHERE session_id = ?" + lf.sql, [sessionId, ...lf.params]);
+  const thi       = scalar("SELECT MAX(timestamp) FROM telemetry WHERE session_id = ?" + lf.sql, [sessionId, ...lf.params]);
+  const durS      = (tlo && thi) ? (thi - tlo) : 0;
+  const tallTLo   = scalar("SELECT MIN(t) FROM telemetry_signals WHERE session_id = ?" + lfT.sql, [sessionId, ...lfT.params]);
+  const tallTHi   = scalar("SELECT MAX(t) FROM telemetry_signals WHERE session_id = ?" + lfT.sql, [sessionId, ...lfT.params]);
+  const tallDur   = (tallTLo && tallTHi) ? (tallTHi - tallTLo) : 0;
+  const signals   = scalar("SELECT COUNT(*) FROM signal_registry") || 0;
+  const distinct  = scalar("SELECT COUNT(DISTINCT signal_id) FROM telemetry_signals WHERE session_id = ?" + lfT.sql, [sessionId, ...lfT.params]) || 0;
+  const distance  = scalar("SELECT MAX(distance_m) - MIN(distance_m) FROM telemetry WHERE session_id = ?" + lf.sql, [sessionId, ...lf.params]) || 0;
+  const peakSpeed = scalar("SELECT MAX(speed_ms)*2.2369362920544 FROM telemetry WHERE session_id = ?" + lf.sql, [sessionId, ...lf.params]) || 0;
+  const peakRpm   = scalar("SELECT MAX(rpm) FROM telemetry WHERE session_id = ?" + lf.sql, [sessionId, ...lf.params]) || 0;
+  const peakG     = scalar("SELECT MAX(combo_g) FROM telemetry WHERE session_id = ?" + lf.sql, [sessionId, ...lf.params]) || 0;
+  const scope     = LAP_FILTER ? LAP_FILTER.name : "Full session";
+
+  panel(`Session · ${scope}` + (LAP_FILTER ? ` <span style="color:var(--fg2);font-weight:400;font-size:11px;margin-left:8px;text-transform:none;letter-spacing:0">(${LAPS.length - 1} lap${LAPS.length === 2 ? "" : "s"} detected via ${LAPS[1]?.method || "—"})</span>` : ""), `
+    <div class="summary-grid">
+      <div class="stat"><div class="v">${sessionId}</div><div class="l">session id</div></div>
+      <div class="stat"><div class="v">${fmtDur(durS)}</div><div class="l">duration</div></div>
+      <div class="stat"><div class="v">${wideN.toLocaleString()}</div><div class="l">wide rows</div></div>
+      <div class="stat"><div class="v">${tallN.toLocaleString()}</div><div class="l">signal samples</div></div>
+      <div class="stat"><div class="v">${distinct}<span style="color:var(--fg2);font-size:14px"> / ${signals}</span></div><div class="l">signals seen</div></div>
+      <div class="stat"><div class="v">${(durS ? wideN / durS : 0).toFixed(1)}<span style="color:var(--fg2);font-size:14px"> Hz</span></div><div class="l">wide rate</div></div>
+      <div class="stat"><div class="v">${(tallDur ? tallN / tallDur : 0).toFixed(0)}<span style="color:var(--fg2);font-size:14px"> /s</span></div><div class="l">signal rate</div></div>
+      <div class="stat"><div class="v">${(distance / 1000).toFixed(2)}<span style="color:var(--fg2);font-size:14px"> km</span></div><div class="l">distance</div></div>
+      <div class="stat"><div class="v">${peakSpeed.toFixed(1)}<span style="color:var(--fg2);font-size:14px"> mph</span></div><div class="l">peak speed</div></div>
+      <div class="stat"><div class="v">${peakRpm.toFixed(0)}</div><div class="l">peak rpm</div></div>
+      <div class="stat"><div class="v">${peakG.toFixed(2)}<span style="color:var(--fg2);font-size:14px"> g</span></div><div class="l">peak combo g</div></div>
+    </div>
+  `);
+}
+
+// ─── wide canonicals as a small-multiples row ──────────────────────────
+function renderWideSeries() {
+  const lf = lapWhereInitial("timestamp");
+  const rows = q("SELECT timestamp, speed_ms, rpm, brake_bar, throttle_pct, g_lat, g_long, combo_g, steering_deg FROM telemetry" + lf.sql + " ORDER BY timestamp", lf.params);
+  if (!rows.length) return;
+  const t0 = rows[0].timestamp;
+  const ts = rows.map((r) => r.timestamp - t0);
+
+  // g_vert lives in telemetry_signals (the wide row schema is fixed at
+  // the original 11 canonicals; g_vert was added later). Pull it
+  // separately and merge by nearest-wide-frame so it overlays cleanly.
+  const lfT = lapWhere("ts.t");
+  const gVertRaw = q(`SELECT ts.t, ts.value FROM telemetry_signals ts
+                      JOIN signal_registry sr USING(signal_id)
+                      WHERE sr.name = 'g_vert'` + lfT.sql + ` ORDER BY ts.t`, lfT.params);
+  const gVertByT = gVertRaw.length ? holdMerge(rows.map((r) => r.timestamp), gVertRaw) : null;
+
+  // Decimate to keep the chart responsive (>5k points slow on phones)
+  const target = 4000;
+  const stride = Math.max(1, Math.floor(rows.length / target));
+  const idx = [];
+  for (let i = 0; i < rows.length; i += stride) idx.push(i);
+  const sel = (col) => idx.map((i) => rows[i][col]);
+  const selV = (arr) => arr ? idx.map((i) => arr[i]) : null;
+  const xs = idx.map((i) => ts[i]);
+
+  // Speed + RPM (twin axis)
+  const p1 = panel("Speed & RPM", `<div class="chart-box tall"><canvas id="cw_speed"></canvas></div>`);
+  CHARTS.push(new Chart(p1.querySelector("#cw_speed"), {
+    type: "line",
+    data: {
+      labels: xs,
+      datasets: [
+        { label: "speed (mph)", data: clipOutliers("speed_mph", sel("speed_ms").map((v) => v == null ? null : v * 2.2369362920544)),
+          borderColor: "#7cc5ff", backgroundColor: "rgba(124,197,255,.1)", borderWidth: 1.5, pointRadius: 0, yAxisID: "y" },
+        { label: "rpm", data: clipOutliers("rpm", sel("rpm")),
+          borderColor: "#f0c674", borderWidth: 1.5, pointRadius: 0, yAxisID: "y2" },
+      ],
+    },
+    options: lineOpts({
+      scales: {
+        x: { type: "linear", title: { display: true, text: "time (s)" } },
+        y:  { position: "left",  title: { display: true, text: "mph" } },
+        y2: { position: "right", title: { display: true, text: "rpm" }, grid: { drawOnChartArea: false } },
+      },
+    }, /*zoom=*/true),
+  }));
+
+  // Driver inputs
+  const p2 = panel("Driver inputs", `<div class="chart-box tall"><canvas id="cw_driver"></canvas></div>`);
+  CHARTS.push(new Chart(p2.querySelector("#cw_driver"), {
+    type: "line",
+    data: {
+      labels: xs,
+      datasets: [
+        { label: "throttle %",       data: clipOutliers("throttle_pct", sel("throttle_pct")),
+          borderColor: "#7ee787", borderWidth: 1.5, pointRadius: 0 },
+        { label: "brake (bar × 10)", data: clipOutliers("brake_bar", sel("brake_bar")).map((v) => v == null ? null : v * 10),
+          borderColor: "#f47174", borderWidth: 1.5, pointRadius: 0 },
+        { label: "steering (°)",     data: clipOutliers("steering_deg", sel("steering_deg")),
+          borderColor: "#c8a2ff", borderWidth: 1.5, pointRadius: 0 },
+      ],
+    },
+    options: lineOpts({ scales: { x: { type: "linear", title: { display: true, text: "time (s)" } }, y: {} } }, true),
+  }));
+
+  // G-forces
+  const p3 = panel("G-forces", `<div class="chart-box tall"><canvas id="cw_g"></canvas></div>`);
+  CHARTS.push(new Chart(p3.querySelector("#cw_g"), {
+    type: "line",
+    data: {
+      labels: xs,
+      datasets: [
+        { label: "g_lat",   data: clipOutliers("g_lat",   sel("g_lat")),   borderColor: "#7cc5ff", borderWidth: 1.5, pointRadius: 0 },
+        { label: "g_long",  data: clipOutliers("g_long",  sel("g_long")),  borderColor: "#f0c674", borderWidth: 1.5, pointRadius: 0 },
+        ...(gVertByT ? [{ label: "g_vert", data: clipOutliers("g_vert", selV(gVertByT)), borderColor: "#7ee787", borderWidth: 1.5, pointRadius: 0 }] : []),
+        { label: "combo_g", data: clipOutliers("combo_g", sel("combo_g")), borderColor: "#f47174", borderWidth: 1, borderDash: [4,3], pointRadius: 0 },
+      ],
+    },
+    options: lineOpts({ scales: { x: { type: "linear", title: { display: true, text: "time (s)" } }, y: { title: { display: true, text: "g" } } } }, true),
+  }));
+
+  // Track map (if we have valid GPS — filter the 214.7 sentinel and zero lat/lon)
+  const lfGps = lapWhere("timestamp");
+  const gps = q("SELECT lat, lon FROM telemetry WHERE session_id = (SELECT session_id FROM sessions LIMIT 1) AND lat BETWEEN -90 AND 90 AND lon BETWEEN -180 AND 180 AND lat <> 0 AND lon < 200" + lfGps.sql, lfGps.params);
+  if (gps.length > 30) {
+    const p4 = panel("GPS trace", `<div class="chart-box tall"><canvas id="cw_gps"></canvas></div>`);
+    CHARTS.push(new Chart(p4.querySelector("#cw_gps"), {
+      type: "scatter",
+      data: { datasets: [{ label: "track", data: gps.map((r) => ({ x: r.lon, y: r.lat })), borderColor: "#7cc5ff", backgroundColor: "#7cc5ff", pointRadius: 1 }] },
+      options: lineOpts({ scales: { x: { type: "linear", title: { display: true, text: "lon" } }, y: { type: "linear", title: { display: true, text: "lat" } } }, aspectRatio: 1.6 }),
+    }));
+  }
+}
+
+// ─── TPMS ───────────────────────────────────────────────────────────────
+function renderTpms() {
+  const corners = ["fl", "fr", "rl", "rr"];
+  const latestVals = {};
+  const lf = lapWhere("ts.t");
+  for (const c of corners) {
+    for (const k of [`tpms_press_${c}_psi`, `tpms_temp_${c}_f`, `tpms_volt_${c}_mv`, `tpms_alm_${c}`]) {
+      const v = scalar(`SELECT value FROM telemetry_signals ts JOIN signal_registry sr USING(signal_id)
+                        WHERE sr.name = ?` + lf.sql + ` ORDER BY ts.t DESC LIMIT 1`, [k, ...lf.params]);
+      latestVals[k] = v;
+    }
+  }
+  // If no TPMS at all, skip
+  if (Object.values(latestVals).every((v) => v == null)) return;
+
+  const p = panel("TPMS (latest sample per corner)", `
+    <div class="tpms">
+      ${corners.map((c) => {
+        const cn = ({fl:"front L", fr:"front R", rl:"rear L", rr:"rear R"})[c];
+        const psi = latestVals[`tpms_press_${c}_psi`];
+        const tf  = latestVals[`tpms_temp_${c}_f`];
+        const vmv = latestVals[`tpms_volt_${c}_mv`];
+        const alm = latestVals[`tpms_alm_${c}`];
+        return `<div class="corner">
+                  <div class="label">${cn}</div>
+                  <div class="p">${psi != null ? psi.toFixed(1) : "—"} <span style="font-size:11px;color:var(--fg2)">psi</span></div>
+                  <div class="t">${tf != null ? tf.toFixed(1) + " °F" : "—"}</div>
+                  <div class="v">batt ${vmv != null ? vmv + " mV" : "—"} · alm 0x${(alm||0).toString(16).padStart(4, "0")}</div>
+                </div>`;
+      }).join("")}
+    </div>
+  `);
+}
+
+// ─── IMU ────────────────────────────────────────────────────────────────
+function renderImu() {
+  // 50 Hz IMU — pull from tall store
+  const accelNames = ["inline_accel_g", "lateral_accel_g", "vertical_accel_g"];
+  const gyroNames  = ["roll_rate_degs", "pitch_rate_degs", "yaw_rate_degs"];
+  const t0 = scalar("SELECT MIN(t) FROM telemetry_signals");
+  if (t0 == null) return;
+
+  const getSeries = (name) => {
+    const lf = lapWhere("ts.t");
+    const rows = q(`SELECT ts.t - ? AS x, ts.value AS y FROM telemetry_signals ts
+                    JOIN signal_registry sr USING(signal_id)
+                    WHERE sr.name = ?` + lf.sql + ` ORDER BY ts.t`, [t0, name, ...lf.params]);
+    // decimate
+    const target = 3000;
+    const stride = Math.max(1, Math.floor(rows.length / target));
+    const out = [];
+    for (let i = 0; i < rows.length; i += stride) out.push(rows[i]);
+    return out;
+  };
+
+  const colors = ["#7cc5ff", "#f0c674", "#7ee787"];
+  const p1 = panel("IMU · accelerometers (0x455, 50 Hz)", `<div class="chart-box"><canvas id="cw_acc"></canvas></div>`);
+  CHARTS.push(new Chart(p1.querySelector("#cw_acc"), {
+    type: "line",
+    data: { datasets: accelNames.map((n, i) => ({ label: n, data: clipOutliers(n, getSeries(n)), borderColor: colors[i], borderWidth: 1, pointRadius: 0 })) },
+    options: lineOpts({ parsing: false, scales: { x: { type: "linear", title: { display: true, text: "time (s)" } }, y: { title: { display: true, text: "g" } } } }),
+  }));
+
+  const p2 = panel("IMU · gyroscopes (0x456, 50 Hz)", `<div class="chart-box"><canvas id="cw_gyro"></canvas></div>`);
+  CHARTS.push(new Chart(p2.querySelector("#cw_gyro"), {
+    type: "line",
+    data: { datasets: gyroNames.map((n, i) => ({ label: n, data: clipOutliers(n, getSeries(n)), borderColor: colors[i], borderWidth: 1, pointRadius: 0 })) },
+    options: lineOpts({ parsing: false, scales: { x: { type: "linear", title: { display: true, text: "time (s)" } }, y: { title: { display: true, text: "°/s" } } } }),
+  }));
+}
+
+// ─── stock comparison panels ────────────────────────────────────────────
+// Pre-canned multi-signal overlays for common groupings — pressures,
+// temps, TPMS time series, etc. Skip a panel if none of its signals
+// have samples.
+function renderStockComparisons() {
+  const presets = [
+    { title: "Engine temperatures",        signals: ["water_temp_f","engine_oil_temp_f","oil_filter_temp_f","ambient_temp_f","logger_temp_f"], unit: "°F" },
+    { title: "Engine pressures",           signals: ["oil_press_psi","water_press_psi","fuel_press_psi","brake_press_psi"], unit: "psi" },
+    { title: "TPMS pressures · all corners", signals: ["tpms_press_fl_psi","tpms_press_fr_psi","tpms_press_rl_psi","tpms_press_rr_psi","tpms_press_avg_psi"], unit: "psi" },
+    { title: "TPMS temperatures · all corners", signals: ["tpms_temp_fl_f","tpms_temp_fr_f","tpms_temp_rl_f","tpms_temp_rr_f","tpms_temp_avg_f"], unit: "°F" },
+    { title: "Wheel speeds (4 corners + avg)", signals: ["wheel_speed_fl_mph","wheel_speed_fr_mph","wheel_speed_rl_mph","wheel_speed_rr_mph","wheel_speed_avg_mph"], unit: "mph" },
+    { title: "GPS · speed sources",        signals: ["gps_speed_mph","wheel_speed_avg_mph"], unit: "mph" },
+  ];
+
+  const palette = ["#7cc5ff","#f0c674","#7ee787","#f47174","#c8a2ff","#9aa0b4","#ffd86b"];
+
+  for (const pre of presets) {
+    // pull each signal's samples (already decimated)
+    const t0Overall = scalar("SELECT MIN(t) FROM telemetry_signals") || 0;
+    const datasets = [];
+    const lf = lapWhere("ts.t");
+    pre.signals.forEach((name, idx) => {
+      const rows = q(`SELECT ts.t - ? AS x, ts.value AS y FROM telemetry_signals ts
+                      JOIN signal_registry sr USING(signal_id)
+                      WHERE sr.name = ?` + lf.sql + ` ORDER BY ts.t`, [t0Overall, name, ...lf.params]);
+      if (!rows.length) return;
+      const target = 3000;
+      const stride = Math.max(1, Math.floor(rows.length / target));
+      const data = [];
+      for (let i = 0; i < rows.length; i += stride) data.push(rows[i]);
+      datasets.push({
+        label: name,
+        data: clipOutliers(name, data),
+        borderColor: palette[idx % palette.length],
+        borderWidth: name.endsWith("_avg_psi") || name.endsWith("_avg_f") || name.endsWith("_avg_mph") ? 2 : 1,
+        borderDash: name.endsWith("_avg_psi") || name.endsWith("_avg_f") || name.endsWith("_avg_mph") ? [6, 3] : [],
+        pointRadius: 0,
+      });
+    });
+    if (!datasets.length) continue;
+
+    const id = "stk_" + pre.title.replace(/[^a-z0-9]+/gi, "_");
+    const p = panel(pre.title, `
+      <div class="chart-toolbar">
+        <button data-act="reset">reset zoom</button>
+        <span style="margin-left:auto;color:var(--fg2)">scroll = zoom · drag = pan · double-click = reset</span>
+      </div>
+      <div class="chart-box tall"><canvas id="${id}"></canvas></div>
+    `);
+    const canvas = p.querySelector("#" + id);
+    const chart = new Chart(canvas, {
+      type: "line",
+      data: { datasets },
+      options: lineOpts({
+        parsing: false,
+        scales: {
+          x: { type: "linear", title: { display: true, text: "time (s)" } },
+          y: { title: { display: true, text: pre.unit } },
+        },
+      }, /*zoom=*/true),
+    });
+    CHARTS.push(chart);
+    p.querySelector('[data-act="reset"]').addEventListener("click", () => chart.resetZoom());
+  }
+}
+
+// ─── ad-hoc multi-signal overlay picker ─────────────────────────────────
+// Pick any subset of signals, plot them on a single chart with twin axes
+// auto-grouped by unit. Search box filters the list.
+function renderPicker() {
+  const sigs = q(`SELECT sr.name, sr.units, sr."group", COUNT(*) AS n
+                  FROM telemetry_signals ts JOIN signal_registry sr USING(signal_id)
+                  GROUP BY sr.signal_id ORDER BY sr."group" NULLS LAST, sr.name`);
+  if (!sigs.length) return;
+
+  const grouped = {};
+  for (const s of sigs) (grouped[s.group || "(other)"] ||= []).push(s);
+
+  const groupHtml = Object.entries(grouped).map(([g, list]) =>
+    `<div class="group-head">${g} · ${list.length}</div>` +
+    list.map((s) =>
+      `<label data-name="${s.name}" data-search="${(s.name + " " + (s.units || "") + " " + (s.group || "")).toLowerCase()}">
+         <input type="checkbox" value="${s.name}" data-units="${s.units || ""}">
+         <span>${s.name}</span>
+         <span class="sig-meta">${s.units || ""} · ${s.n.toLocaleString()}</span>
+       </label>`
+    ).join("")
+  ).join("");
+
+  const p = panel("Multi-signal overlay", `
+    <div class="quick-presets">
+      <button data-preset="speed_rpm">speed + rpm</button>
+      <button data-preset="driver">throttle + brake + steering</button>
+      <button data-preset="g">g_lat + g_long + g_vert</button>
+      <button data-preset="imu">accel + gyro (50 Hz)</button>
+      <button data-preset="oil">oil press + oil filter temp + engine oil temp</button>
+      <button data-preset="clear">clear</button>
+    </div>
+    <div class="multi-picker">
+      <div class="left">
+        <input type="search" id="sig-search" placeholder="filter signals…">
+        <div class="pick-actions">
+          <button class="btn" id="sig-clear" style="background:var(--bg3);color:var(--fg);padding:4px 10px;border-radius:4px;border:1px solid var(--grid);cursor:pointer;">clear all</button>
+          <span class="legend-hint" id="sig-counter">0 selected</span>
+        </div>
+        <div class="sig-list" id="sig-list">${groupHtml}</div>
+      </div>
+      <div>
+        <div class="chart-toolbar">
+          <button data-act="reset">reset zoom</button>
+          <span style="margin-left:auto;color:var(--fg2)">scroll = zoom · drag = pan</span>
+        </div>
+        <div class="chart-box tall"><canvas id="cw_multi"></canvas></div>
+      </div>
+    </div>
+  `);
+
+  const list   = p.querySelector("#sig-list");
+  const search = p.querySelector("#sig-search");
+  const clear  = p.querySelector("#sig-clear");
+  const counter = p.querySelector("#sig-counter");
+  const canvas = p.querySelector("#cw_multi");
+  const resetBtn = p.querySelector('[data-act="reset"]');
+  let chart = null;
+  const colors = ["#7cc5ff","#f0c674","#7ee787","#f47174","#c8a2ff","#ffd86b","#9aa0b4","#76d3c4","#ff9ab6","#a3b0ff"];
+
+  const checkedNames = () =>
+    [...list.querySelectorAll("input:checked")].map((i) => ({ name: i.value, units: i.dataset.units }));
+
+  const draw = () => {
+    if (chart) { chart.destroy(); CHARTS.splice(CHARTS.indexOf(chart), 1); chart = null; }
+    const picks = checkedNames();
+    counter.textContent = `${picks.length} selected`;
+    if (!picks.length) { return; }
+
+    // Group picks by unit so the chart has at most 2 y-axes (anything
+    // beyond that we share with the dominant axis to keep it readable).
+    const unitGroups = {};
+    for (const p of picks) (unitGroups[p.units || "—"] ||= []).push(p);
+    const unitKeys = Object.keys(unitGroups);
+    const yIds = { [unitKeys[0]]: "y" };
+    if (unitKeys[1]) yIds[unitKeys[1]] = "y2";
+
+    const t0Overall = scalar("SELECT MIN(t) FROM telemetry_signals") || 0;
+    const datasets = [];
+    const lf = lapWhere("ts.t");
+    picks.forEach((pp, idx) => {
+      const rows = q(`SELECT ts.t - ? AS x, ts.value AS y FROM telemetry_signals ts
+                      JOIN signal_registry sr USING(signal_id)
+                      WHERE sr.name = ?` + lf.sql + ` ORDER BY ts.t`, [t0Overall, pp.name, ...lf.params]);
+      if (!rows.length) return;
+      const target = 3000;
+      const stride = Math.max(1, Math.floor(rows.length / target));
+      const data = [];
+      for (let i = 0; i < rows.length; i += stride) data.push(rows[i]);
+      datasets.push({
+        label: pp.name + (pp.units ? ` (${pp.units})` : ""),
+        data: clipOutliers(pp.name, data),
+        borderColor: colors[idx % colors.length],
+        borderWidth: 1.2,
+        pointRadius: 0,
+        yAxisID: yIds[pp.units || "—"] || "y",
+      });
+    });
+
+    const scales = {
+      x: { type: "linear", title: { display: true, text: "time (s)" } },
+      y: { position: "left", title: { display: true, text: unitKeys[0] || "" } },
+    };
+    if (unitKeys[1]) {
+      scales.y2 = { position: "right", title: { display: true, text: unitKeys[1] }, grid: { drawOnChartArea: false } };
+    }
+    chart = new Chart(canvas, {
+      type: "line",
+      data: { datasets },
+      options: lineOpts({ parsing: false, scales }, true),
+    });
+    CHARTS.push(chart);
+  };
+
+  // toggle handlers + visual checked-state
+  list.addEventListener("change", (e) => {
+    if (e.target.tagName !== "INPUT") return;
+    const lab = e.target.closest("label");
+    lab.classList.toggle("checked", e.target.checked);
+    draw();
+  });
+
+  // search
+  search.addEventListener("input", () => {
+    const needle = search.value.trim().toLowerCase();
+    list.querySelectorAll("label").forEach((lab) => {
+      const match = !needle || lab.dataset.search.includes(needle);
+      lab.style.display = match ? "" : "none";
+    });
+    // hide group heads with no visible children
+    list.querySelectorAll(".group-head").forEach((h) => {
+      let n = h.nextElementSibling, any = false;
+      while (n && !n.classList.contains("group-head")) {
+        if (n.tagName === "LABEL" && n.style.display !== "none") any = true;
+        n = n.nextElementSibling;
+      }
+      h.style.display = any ? "" : "none";
+    });
+  });
+
+  clear.addEventListener("click", () => {
+    list.querySelectorAll("input:checked").forEach((i) => { i.checked = false; i.closest("label").classList.remove("checked"); });
+    draw();
+  });
+
+  resetBtn.addEventListener("click", () => chart?.resetZoom());
+
+  // Presets
+  const presetMap = {
+    speed_rpm: ["speed_ms", "rpm"],
+    driver:    ["throttle_pct", "brake_bar", "steering_deg"],
+    g:         ["g_lat", "g_long", "g_vert"],
+    imu:       ["inline_accel_g","lateral_accel_g","vertical_accel_g","roll_rate_degs","pitch_rate_degs","yaw_rate_degs"],
+    oil:       ["oil_press_psi","oil_filter_temp_f","engine_oil_temp_f"],
+    clear:     [],
+  };
+  p.querySelectorAll(".quick-presets button").forEach((b) => {
+    b.addEventListener("click", () => {
+      const want = new Set(presetMap[b.dataset.preset] || []);
+      list.querySelectorAll("input").forEach((i) => {
+        i.checked = want.has(i.value);
+        i.closest("label").classList.toggle("checked", i.checked);
+      });
+      draw();
+    });
+  });
+
+  // Default selection — speed + rpm if both exist
+  list.querySelectorAll('input[value="speed_ms"], input[value="rpm"]').forEach((i) => {
+    i.checked = true; i.closest("label").classList.add("checked");
+  });
+  draw();
+}
+
+// ─── track map (Leaflet) ────────────────────────────────────────────────
+// Cached centerline + corners loaded from /data/tracks/sonoma_real_gps.json
+// the first time renderTrackMap is called.
+let SONOMA_TRACK = null;
+let MAP_INSTANCE = null;
+
+async function loadSonomaTrack() {
+  if (SONOMA_TRACK) return SONOMA_TRACK;
+  try {
+    const res = await fetch("/data/tracks/sonoma_real_gps.json");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    SONOMA_TRACK = await res.json();
+  } catch (e) {
+    console.warn("Could not load Sonoma track:", e);
+    SONOMA_TRACK = null;
+  }
+  return SONOMA_TRACK;
+}
+
+function renderTrackMap() {
+  const id = "track_map_" + Math.random().toString(36).slice(2);
+  const p = panel("Track map · Sonoma Raceway", `
+    <div id="${id}" class="map-box"></div>
+    <div class="map-legend">
+      <span><span class="swatch" style="background:#7cc5ff"></span>centerline</span>
+      <span><span class="swatch" style="background:#f0c674"></span>recorded path (raw GPS)</span>
+      <span><span class="swatch" style="background:#7ee787"></span>virtual path (distance → centerline)</span>
+      <span id="map-note" style="margin-left:auto"></span>
+    </div>
+  `);
+  setTimeout(() => initMap(id), 0); // wait for DOM mount
+}
+
+async function initMap(elId) {
+  const sessionId = currentSessionId();
+  const track = await loadSonomaTrack();
+
+  // Pick a sane initial view
+  let center = [38.1607, -122.4549];
+  let zoom = 16;
+  if (track && track.real_centerline && track.real_centerline.length) {
+    center = [track.real_centerline[0].lat, track.real_centerline[0].lon];
+  }
+
+  const map = L.map(elId, { zoomSnap: 0.25, attributionControl: true }).setView(center, zoom);
+  MAP_INSTANCE = map;
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }
+  ).addTo(map);
+
+  const note = document.getElementById("map-note");
+
+  // 1. Centerline + corners
+  let centerline = null;
+  if (track && track.real_centerline) {
+    centerline = track.real_centerline.map((p) => [p.lat, p.lon]);
+    L.polyline(centerline, { color: "#7cc5ff", weight: 3, opacity: 0.85 }).addTo(map);
+    map.fitBounds(L.latLngBounds(centerline), { padding: [30, 30] });
+
+    if (track.corners) {
+      for (const c of track.corners) {
+        if (c.apex && c.apex.lat) {
+          L.marker([c.apex.lat, c.apex.lon], {
+            icon: L.divIcon({ className: "corner-marker", html: c.number, iconSize: [20, 20] }),
+          }).bindTooltip(`${c.name}${c.nicknames && c.nicknames[0] ? " · " + c.nicknames[0] : ""}`).addTo(map);
+        }
+      }
+    }
+  }
+
+  // 2. Raw GPS path (filter sentinels)
+  const lf = lapWhere("timestamp");
+  const realGps = q(`SELECT lat, lon FROM telemetry
+                     WHERE session_id = ? AND lat > -89 AND lat < 89
+                       AND lon BETWEEN -180 AND 180
+                       AND lat <> 0 AND lon <> 0 AND lon < 200` + lf.sql + ` ORDER BY timestamp`,
+                    [sessionId, ...lf.params]);
+  if (realGps.length > 30) {
+    const path = realGps.map((r) => [r.lat, r.lon]);
+    L.polyline(path, { color: "#f0c674", weight: 2, opacity: 0.85 }).addTo(map);
+  }
+
+  // 3. Virtual path: map distance_m onto centerline. Useful when GPS lon
+  //    was sentinel-bound for the whole session (our case).
+  if (centerline && track && track.real_centerline) {
+    // Use distance from the recording's start frame so partial sessions still align.
+    const rows = q(`SELECT timestamp, distance_m FROM telemetry
+                    WHERE session_id = ? AND distance_m IS NOT NULL` + lf.sql + ` ORDER BY timestamp`,
+                   [sessionId, ...lf.params]);
+    if (rows.length > 30) {
+      const trackLen = track.track_length_m || 4258;
+      const cl = track.real_centerline;
+      // Build a quick distance-index lookup table from centerline points
+      const dists = cl.map((p) => p.distance);
+      const d0 = rows[0].distance_m;
+      const virt = [];
+      for (let i = 0; i < rows.length; i++) {
+        const dAlongTrack = ((rows[i].distance_m - d0) % trackLen + trackLen) % trackLen;
+        // Find bracketing centerline points by distance
+        let lo = 0, hi = cl.length - 1;
+        while (lo < hi - 1) {
+          const mid = (lo + hi) >> 1;
+          if (dists[mid] <= dAlongTrack) lo = mid; else hi = mid;
+        }
+        const a = cl[lo], b = cl[hi];
+        const span = (b.distance - a.distance) || 1;
+        const t = (dAlongTrack - a.distance) / span;
+        virt.push([a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t]);
+      }
+      // Decimate the virtual polyline for rendering
+      const stride = Math.max(1, Math.floor(virt.length / 4000));
+      const pts = [];
+      for (let i = 0; i < virt.length; i += stride) pts.push(virt[i]);
+      L.polyline(pts, { color: "#7ee787", weight: 2, opacity: 0.85, dashArray: "3 3" }).addTo(map);
+
+      if (LAP_FILTER) {
+        // Mark lap start
+        L.circleMarker(virt[0], { radius: 7, color: "#7ee787", fillColor: "#7ee787", fillOpacity: 0.8, weight: 1 })
+          .bindTooltip(`${LAP_FILTER.name} start`).addTo(map);
+        L.circleMarker(virt[virt.length - 1], { radius: 7, color: "#f47174", fillColor: "#f47174", fillOpacity: 0.8, weight: 1 })
+          .bindTooltip(`${LAP_FILTER.name} end`).addTo(map);
+      }
+      note.textContent = realGps.length > 30
+        ? `${realGps.length.toLocaleString()} GPS samples + ${virt.length.toLocaleString()} virtual position points`
+        : `GPS longitude sentinel-bound · virtual path derived from ${virt.length.toLocaleString()} distance samples`;
+    } else {
+      note.textContent = "no movement data";
+    }
+  } else if (realGps.length === 0) {
+    note.textContent = "no valid GPS fix in this session";
+  } else {
+    note.textContent = "centerline not loaded — showing raw GPS only";
+  }
+
+  // Force a recompute since the map was created in a hidden/sized container.
+  setTimeout(() => map.invalidateSize(), 100);
+}
+
+// ─── outlier filtering ─────────────────────────────────────────────────
+// Per-signal sanity ranges. Values outside these are replaced with null
+// (a gap in the line) when the "filter outliers" toggle is on.
+// Pulled from the AiM MXP v3.0 PDF + DBC value_range hints + reality.
+const SANITY_RANGES = {
+  // pressures
+  brake_press_psi:    { min: 0,    max: 200   },  // line pressure rarely > 100 psi street
+  brake_bar:          { min: 0,    max: 14    },  // 200 psi ≈ 13.8 bar
+  oil_press_psi:      { min: 0,    max: 150   },  // BMW S54 redline ~80 psi cold; FFFF→6553 = sentinel
+  oil_press_bar:      { min: 0,    max: 10    },
+  water_press_psi:    { min: 0,    max: 60    },
+  water_press_bar:    { min: 0,    max: 4     },
+  fuel_press_psi:     { min: 0,    max: 150   },
+  // temperatures (°F)
+  water_temp_f:       { min: -40,  max: 350   },
+  engine_oil_temp_f:  { min: -40,  max: 400   },
+  oil_filter_temp_f:  { min: -40,  max: 400   },
+  ambient_temp_f:     { min: -40,  max: 150   },
+  logger_temp_f:      { min: -40,  max: 200   },
+  // TPMS
+  tpms_press_fl_psi:  { min: 5,    max: 60    },
+  tpms_press_fr_psi:  { min: 5,    max: 60    },
+  tpms_press_rl_psi:  { min: 5,    max: 60    },
+  tpms_press_rr_psi:  { min: 5,    max: 60    },
+  tpms_temp_fl_f:     { min: 32,   max: 250   },
+  tpms_temp_fr_f:     { min: 32,   max: 250   },
+  tpms_temp_rl_f:     { min: 32,   max: 250   },
+  tpms_temp_rr_f:     { min: 32,   max: 250   },
+  // IMU
+  inline_accel_g:     { min: -3.5, max: 3.5   },
+  lateral_accel_g:    { min: -3.5, max: 3.5   },
+  vertical_accel_g:   { min: -3.5, max: 3.5   },
+  g_lat:              { min: -3.5, max: 3.5   },
+  g_long:             { min: -3.5, max: 3.5   },
+  g_vert:             { min: -3.5, max: 3.5   },
+  combo_g:            { min: 0,    max: 5     },
+  roll_rate_degs:     { min: -360, max: 360   },
+  pitch_rate_degs:    { min: -360, max: 360   },
+  yaw_rate_degs:      { min: -360, max: 360   },
+  // ECU
+  rpm:                { min: 0,    max: 10000 },
+  speed_ms:           { min: 0,    max: 120   },  // 268 mph cap
+  speed_mph:          { min: 0,    max: 250   },
+  steering_deg:       { min: -540, max: 540   },
+  throttle_pct:       { min: 0,    max: 100   },
+  pedal_pos_pct:      { min: 0,    max: 100   },
+  fuel_level_gal:     { min: 0,    max: 30    },
+  battery_volt:       { min: 0,    max: 16    },
+};
+
+// Sanity-clip an array of {x,y} or scalar values, replacing out-of-range
+// y-values with null. If outlier filter is off, returns input unchanged.
+function clipOutliers(name, data) {
+  if (!FILTER_OUTLIERS) return data;
+  const r = SANITY_RANGES[name];
+  if (!r) return data;
+  return data.map((d) => {
+    if (d == null) return d;
+    const isObj = typeof d === "object";
+    const y = isObj ? d.y : d;
+    if (y == null || y < r.min || y > r.max) {
+      return isObj ? { x: d.x, y: null } : null;
+    }
+    return d;
+  });
+}
+
+// ─── schema / dev panel ────────────────────────────────────────────────
+function renderSchema() {
+  const tables = q("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+  const lines = tables.map((t) => {
+    const n = scalar(`SELECT COUNT(*) FROM "${t.name}"`);
+    return `${t.name.padEnd(24)} ${n.toLocaleString()} rows`;
+  }).join("\n");
+  panel("Schema", `<details><summary>tables and row counts</summary><pre>${lines}</pre></details>`);
+}
+
+// ─── chart options ──────────────────────────────────────────────────────
+function lineOpts(extra = {}, enableZoom = false) {
+  const plugins = {
+    legend: { labels: { color: "#9aa0b4", boxWidth: 10, boxHeight: 1, font: { size: 11 } } },
+    tooltip: { backgroundColor: "#15151c", titleColor: "#e9e9f0", bodyColor: "#e9e9f0", borderColor: "#262635", borderWidth: 1 },
+  };
+  if (enableZoom) {
+    plugins.zoom = {
+      pan:  { enabled: true, mode: "x", modifierKey: undefined },
+      zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "x" },
+      limits: { x: { minRange: 0.05 } },
+    };
+  }
+  const base = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { intersect: false, mode: "index" },
+    plugins,
+    elements: { line: { tension: 0.05 } },
+    scales: {
+      x: { ticks: { color: "#9aa0b4", maxRotation: 0 }, grid: { color: "rgba(255,255,255,.04)" } },
+      y: { ticks: { color: "#9aa0b4" }, grid: { color: "rgba(255,255,255,.04)" } },
+    },
+  };
+  // Deep-merge `scales` so callers can override axis config without
+  // losing the default tick colors.
+  if (extra.scales) {
+    const mergedScales = {};
+    for (const k of Object.keys(base.scales)) mergedScales[k] = base.scales[k];
+    for (const [k, v] of Object.entries(extra.scales)) {
+      mergedScales[k] = Object.assign({}, base.scales[k] || {}, v);
+    }
+    extra = Object.assign({}, extra, { scales: mergedScales });
+  }
+  return Object.assign(base, extra);
+}
+
+// Hold-merge a (t,value) series onto a target timestamp axis. For each
+// axis_t, returns the value of the most recent (t,v) with t ≤ axis_t,
+// or null if axis_t < first sample.
+function holdMerge(axisTs, samples) {
+  if (!samples.length) return axisTs.map(() => null);
+  const out = new Array(axisTs.length);
+  let j = 0;
+  const n = samples.length;
+  for (let i = 0; i < axisTs.length; i++) {
+    const at = axisTs[i];
+    while (j < n && samples[j].t <= at) j++;
+    out[i] = j === 0 ? null : samples[j - 1].value;
+  }
+  return out;
+}
+
+function fmtDur(s) {
+  if (!s) return "—";
+  if (s < 60) return s.toFixed(1) + " s";
+  if (s < 3600) return Math.floor(s / 60) + "m " + Math.floor(s % 60) + "s";
+  return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+}
+</script>
+</body>
+</html>

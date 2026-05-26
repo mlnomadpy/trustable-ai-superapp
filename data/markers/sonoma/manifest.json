@@ -1,0 +1,151 @@
+{
+  "source_vbo": "/Users/tahabsn/Documents/GitHub/forza/data/Sonoma Intermediate - 1_47.5.vbo",
+  "source_mp4": "/Users/tahabsn/Documents/GitHub/forza/data/Sonoma Intermediate - 1_47.5.mp4",
+  "track_length_m": 4258.0,
+  "thumbnails": [
+    {
+      "marker_id": "T1_kwall_bend",
+      "label": "the K-wall bend",
+      "distance_m": 66.0,
+      "frame_idx": 73,
+      "frame_gap_m": 0.11,
+      "avitime_s": 18.366,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T1_kwall_bend.jpg"
+    },
+    {
+      "marker_id": "T2_bridge",
+      "label": "the bridge",
+      "distance_m": 476.0,
+      "frame_idx": 6272,
+      "frame_gap_m": 0.6,
+      "avitime_s": 638.266,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T2_bridge.jpg"
+    },
+    {
+      "marker_id": "T2_pavement_cracks",
+      "label": "the pavement cracks",
+      "distance_m": 506.0,
+      "frame_idx": 6281,
+      "frame_gap_m": 0.4,
+      "avitime_s": 639.166,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T2_pavement_cracks.jpg"
+    },
+    {
+      "marker_id": "T3_light_poles",
+      "label": "the light poles in the stands",
+      "distance_m": 608.0,
+      "frame_idx": 356,
+      "frame_gap_m": 0.01,
+      "avitime_s": 46.666,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T3_light_poles.jpg"
+    },
+    {
+      "marker_id": "T3_right_curbing",
+      "label": "the right-hand curbing",
+      "distance_m": 668.0,
+      "frame_idx": 382,
+      "frame_gap_m": 0.15,
+      "avitime_s": 49.266,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T3_right_curbing.jpg"
+    },
+    {
+      "marker_id": "T4_left_wall_step",
+      "label": "where the left wall steps up",
+      "distance_m": 936.0,
+      "frame_idx": 7434,
+      "frame_gap_m": 0.12,
+      "avitime_s": 754.466,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T4_left_wall_step.jpg"
+    },
+    {
+      "marker_id": "T6_tires_left",
+      "label": "the tire stacks on the left",
+      "distance_m": 1244.0,
+      "frame_idx": 2223,
+      "frame_gap_m": 0.34,
+      "avitime_s": 233.366,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T6_tires_left.jpg"
+    },
+    {
+      "marker_id": "T6_crest",
+      "label": "just after the slight crest",
+      "distance_m": 1264.0,
+      "frame_idx": 2228,
+      "frame_gap_m": 0.05,
+      "avitime_s": 233.866,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T6_crest.jpg"
+    },
+    {
+      "marker_id": "T6_corner_station",
+      "label": "the corner station on the right",
+      "distance_m": 1294.0,
+      "frame_idx": 2236,
+      "frame_gap_m": 0.2,
+      "avitime_s": 234.666,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T6_corner_station.jpg"
+    },
+    {
+      "marker_id": "T7_300_board",
+      "label": "the 300 board",
+      "distance_m": 1460.0,
+      "frame_idx": 3328,
+      "frame_gap_m": 0.26,
+      "avitime_s": 343.866,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T7_300_board.jpg"
+    },
+    {
+      "marker_id": "T10_toyota_sign",
+      "label": "the Toyota sign letters",
+      "distance_m": 2556.0,
+      "frame_idx": 2551,
+      "frame_gap_m": 0.08,
+      "avitime_s": 266.166,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T10_toyota_sign.jpg"
+    },
+    {
+      "marker_id": "T10_left_berm",
+      "label": "the left berm",
+      "distance_m": 2566.0,
+      "frame_idx": 7856,
+      "frame_gap_m": 0.27,
+      "avitime_s": 796.699,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T10_left_berm.jpg"
+    },
+    {
+      "marker_id": "T11_bump",
+      "label": "the bump where the road widens left",
+      "distance_m": 4000.0,
+      "frame_idx": 7140,
+      "frame_gap_m": 0.14,
+      "avitime_s": 725.066,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T11_bump.jpg"
+    },
+    {
+      "marker_id": "T11_pit_entry",
+      "label": "the pit-entry lines on the left",
+      "distance_m": 4030.0,
+      "frame_idx": 5009,
+      "frame_gap_m": 0.56,
+      "avitime_s": 511.966,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T11_pit_entry.jpg"
+    },
+    {
+      "marker_id": "T11_tire_stacks_turnin",
+      "label": "the start of the tire stacks on the left",
+      "distance_m": 4100.0,
+      "frame_idx": 6095,
+      "frame_gap_m": 0.34,
+      "avitime_s": 620.566,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T11_tire_stacks_turnin.jpg"
+    },
+    {
+      "marker_id": "T11_tire_stack_3",
+      "label": "the third tire stack",
+      "distance_m": 4120.0,
+      "frame_idx": 1852,
+      "frame_gap_m": 0.32,
+      "avitime_s": 196.266,
+      "out_path": "/Users/tahabsn/Documents/GitHub/pitwall/data/markers/sonoma/T11_tire_stack_3.jpg"
+    }
+  ]
+}

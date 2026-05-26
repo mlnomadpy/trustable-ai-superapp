@@ -1,0 +1,154 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FLEXIBLE RETRO PIXEL BUTTONS
+ * Extracted from high-fidelity 3D design to be usable anywhere
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.retro-btn {
+  /* Default to Red if variables aren't set */
+  --rb-c1: var(--btn-c1, #ff6b6b);
+  --rb-c2: var(--btn-c2, #ff4757);
+  --rb-c3: var(--btn-c3, #c44569);
+  --rb-s1: var(--btn-s1, #a5394a);
+  --rb-s2: var(--btn-s2, #8b2635);
+  
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  background: linear-gradient(135deg, var(--rb-c2) 0%, var(--rb-c2) 50%, var(--rb-c3) 100%);
+  border: 4px solid #0d0d12;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  color: #fff;
+  text-transform: uppercase;
+  outline: none;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 10;
+  
+  /* Flexible clip-path for cut corners */
+  clip-path: polygon(
+    0px 8px, 8px 0px,
+    calc(100% - 8px) 0px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 8px) 100%,
+    8px 100%, 0px calc(100% - 8px)
+  );
+  
+  box-shadow:
+    0 0 0 2px var(--rb-c2),
+    0 0 0 4px #0d0d12,
+    0 6px 0 var(--rb-c3),
+    0 10px 0 var(--rb-s1),
+    inset 0 2px 4px rgba(255, 255, 255, 0.2),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    
+  margin-bottom: 10px; /* Space for the 3D shadow */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  
+  text-shadow: 2px 2px 0 #0d0d12, 3px 3px 0 rgba(0, 0, 0, 0.5);
+  font-weight: bold;
+}
+
+/* Ensure inner text/elements are above the background effects */
+.retro-btn > * {
+  position: relative;
+  z-index: 5;
+  transform: translateZ(20px);
+}
+
+/* Base structural effects common to all retro buttons */
+.retro-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 3px
+  );
+  z-index: 2;
+  pointer-events: none;
+}
+
+.retro-btn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(
+    45deg,
+    transparent 48%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 52%
+  );
+  background-size: 20px 20px;
+  animation: bg-shift 3s linear infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Hover State */
+.retro-btn:hover:not(:disabled):not(.disabled) {
+  transform: translateY(-4px) rotateX(5deg) scale(1.02);
+  background: linear-gradient(135deg, var(--rb-c1) 0%, var(--rb-c2) 50%, var(--rb-c3) 100%);
+  box-shadow:
+    0 0 0 2px var(--rb-c1),
+    0 0 0 4px #0d0d12,
+    0 10px 0 var(--rb-c3),
+    0 14px 0 var(--rb-s1),
+    0 16px 20px rgba(0, 0, 0, 0.4),
+    inset 0 2px 6px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Active State */
+.retro-btn:active:not(:disabled):not(.disabled) {
+  transform: translateY(2px) scale(0.98);
+  background: linear-gradient(135deg, var(--rb-c3) 0%, var(--rb-s1) 50%, var(--rb-s2) 100%);
+  box-shadow:
+    0 0 0 2px var(--rb-c3),
+    0 0 0 4px #0d0d12,
+    0 2px 0 var(--rb-s2),
+    0 4px 0 rgba(0, 0, 0, 0.6),
+    inset 0 2px 8px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 4px rgba(255, 255, 255, 0.1);
+  margin-bottom: 2px;
+  margin-top: 8px;
+}
+
+.retro-btn:disabled, .retro-btn.disabled {
+  filter: grayscale(0.8) brightness(0.6);
+  cursor: not-allowed;
+  transform: none !important;
+  animation: none !important;
+}
+
+/* Color Variants */
+.retro-btn-red {
+  --btn-c1: #ff6b6b; --btn-c2: #ff4757; --btn-c3: #c44569;
+  --btn-s1: #a5394a; --btn-s2: #8b2635;
+}
+
+.retro-btn-blue {
+  --btn-c1: #4ecdc4; --btn-c2: #2aa198; --btn-c3: #1c7e77;
+  --btn-s1: #14625d; --btn-s2: #0d4642;
+}
+
+.retro-btn-gold {
+  --btn-c1: #ffeaa7; --btn-c2: #fdcb6e; --btn-c3: #e1b12c;
+  --btn-s1: #c29828; --btn-s2: #9b7920;
+}
+
+.retro-btn-dark {
+  --btn-c1: #3d4458; --btn-c2: #2a2f42; --btn-c3: #1f2230;
+  --btn-s1: #161822; --btn-s2: #0d0d12;
+}
+
+@keyframes bg-shift {
+  0% { background-position: 0px 0px; }
+  100% { background-position: 20px 20px; }
+}

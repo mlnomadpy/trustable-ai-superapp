@@ -1,0 +1,70 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+.installed.cfg
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.profraw
+default.profraw
+
+# Node / Vite / PWA
+node_modules/
+apps/pwa/dist/
+apps/pwa/.vite/
+apps/pwa/test-results/
+apps/pwa/playwright-report/
+apps/pwa/coverage/
+*.log
+.npm/
+
+# mkdocs
+site/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# DuckDB / SQLite working files
+*.duckdb
+*.duckdb.wal
+*.duckdb.shm
+*.sqlite-journal
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Termux + phone artifacts staged locally
+.context/
+.antigravitycli/
+
+# Build outputs (catch-all for any future subproject)
+build/
+out/
+dist/

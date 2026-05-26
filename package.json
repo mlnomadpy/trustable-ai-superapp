@@ -1,0 +1,16 @@
+{
+  "name": "trustable-ai-superapp",
+  "private": true,
+  "scripts": {
+    "pwa:install": "npm install --prefix apps/pwa",
+    "pwa:dev": "npm run dev --prefix apps/pwa",
+    "pwa:build": "npm install --prefix apps/pwa && npm run build --prefix apps/pwa",
+    "pwa:test": "npm test --prefix apps/pwa",
+    "pwa:deploy": "npm run pwa:build && firebase deploy --only hosting",
+    "docs:build": "mkdocs build",
+    "docs:serve": "mkdocs serve"
+  },
+  "devDependencies": {
+    "firebase-tools": "^14.12.0"
+  }
+}

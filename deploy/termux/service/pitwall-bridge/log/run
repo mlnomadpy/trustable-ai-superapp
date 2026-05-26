@@ -1,0 +1,12 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# svlogd writes pitwall_bridge stdout/stderr here, rotating at 1 MB,
+# keeping 10 historical files. Logs land in $HOME/.pitwall-logs/.
+#
+# View live:  tail -f $HOME/.pitwall-logs/current
+# View past:  ls -lt $HOME/.pitwall-logs/
+
+LOG_DIR="${PITWALL_LOG_DIR:-$HOME/.pitwall-logs}"
+mkdir -p "$LOG_DIR"
+
+# svlogd config: max file size 1 MB, keep 10 rotated files
+exec svlogd -tt -s1000000 -n10 "$LOG_DIR"

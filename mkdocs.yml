@@ -1,0 +1,167 @@
+site_name: Pitwall Sprint — Trustable AI Racing Coach
+site_url: https://www.tahabouhsine.com/pitwall/
+site_description: Real-time on-device AI coaching for Sonoma Raceway — built with Antigravity, Gemini CLI, Android Studio, Jetpack Compose, Google ADK, and Gemma 4 via LiteRT-LM.
+repo_url: https://github.com/mlnomadpy/pitwall
+repo_name: mlnomadpy/pitwall
+edit_uri: edit/master/docs/
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: deep orange
+    accent: amber
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - toc.integrate
+  font:
+    text: Google Sans
+    code: Roboto Mono
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Built with Google: stack.md
+  - Architecture: architecture.md
+  - Internal Architecture: internal_architecture.md
+  - Audit Report: AUDIT.md
+  - API Reference: api.md
+  - Track Markers: markers.md
+  - Sonoma Track Intelligence: sonoma_track_intelligence.md
+  - "T-Rod Sonoma Session": trod_sonoma_session.md
+  - "Sonoma Maneuvers": sonoma_maneuvers.md
+  - "LiteRT Termux Validation": litert_termux_validation.md
+  - Telemetry Pipeline: telemetry-pipeline.md
+  - Coaching Engine: coaching-engine.md
+  - Pedagogy: pedagogy.md
+  - Hardware: hardware.md
+  - UX: ux.md
+  - "Pitwall-Web (PWA) Design": pitwall-web-design.md
+  - "Pitwall-Web (Vue) Journey":
+      - Overview: vue/README.md
+      - "Foundation":
+          - "00 · Design philosophy": vue/00-design-philosophy.md
+          - "01 · Visual language": vue/01-visual-language.md
+          - "02 · Sprite-sheet spec": vue/02-sprite-sheet-spec.md
+          - "03 · Character bible": vue/03-character-bible.md
+          - "10 · Coach emotions (Gemma-controlled)": vue/10-coach-emotions.md
+      - "Systems":
+          - "04 · State architecture": vue/04-state-architecture.md
+          - "05 · Routing map": vue/05-routing-map.md
+          - "06 · Audio design": vue/06-audio-design.md
+          - "07 · Controls": vue/07-controls.md
+          - "08 · Animation spec": vue/08-animation-spec.md
+          - "09 · Tech stack": vue/09-tech-stack.md
+          - "11 · Navigation map (god mermaid)": vue/11-navigation-map.md
+      - "Screens — boot + identity":
+          - "00 · Title": vue/screens/00-title.md
+          - "01 · Save select": vue/screens/01-save-select.md
+          - "02 · Onboarding": vue/screens/02-onboarding.md
+      - "Screens — hub + navigation":
+          - "03 · Garage Hub": vue/screens/03-garage-hub.md
+          - "04 · Trainer Card": vue/screens/04-trainer-card.md
+          - "05 · Coach Select": vue/screens/05-coach-select.md
+          - "06 · World Map": vue/screens/06-world-map.md
+          - "12 · Quest Log": vue/screens/12-quest-log.md
+          - "13 · Settings": vue/screens/13-settings.md
+      - "Screens — session loop":
+          - "15 · Pit Stall Setup": vue/screens/15-pit-stall-setup.md
+          - "07 · Pre-Brief": vue/screens/07-pre-brief.md
+          - "37 · Track Walk": vue/screens/37-track-walk.md
+          - "08 · On-Track HUD": vue/screens/08-on-track-hud.md
+          - "09 · Cool-Down": vue/screens/09-cool-down.md
+          - "10 · Stage Clear": vue/screens/10-stage-clear.md
+      - "Screens — analytics":
+          - "16 · Analysis Hub": vue/screens/16-analysis-hub.md
+          - "17 · Lap Times Hall": vue/screens/17-lap-times-hall.md
+          - "18 · Corner Mastery": vue/screens/18-corner-mastery.md
+          - "19 · Straights & Speed": vue/screens/19-straights-and-speed.md
+          - "20 · Track Atlas": vue/screens/20-track-atlas.md
+          - "21 · Driver Evolution": vue/screens/21-driver-evolution.md
+          - "22 · Pedal Profile": vue/screens/22-pedal-profile.md
+      - "Screens — overlays + modals":
+          - "_ · Coach Speaks Modal (pattern)": vue/screens/_coach-speaks-modal.md
+          - "23 · Pause / Quick Menu": vue/screens/23-pause-quick-menu.md
+          - "24 · Achievement Toast": vue/screens/24-achievement-toast.md
+          - "25 · Loading Screen": vue/screens/25-loading-screen.md
+          - "26 · Bridge Offline": vue/screens/26-bridge-offline.md
+          - "33 · Notification Center": vue/screens/33-notification-center.md
+          - "34 · Tutorial Overlay": vue/screens/34-tutorial-overlay.md
+          - "35 · Daily Streak": vue/screens/35-daily-streak.md
+      - "Screens — power-user":
+          - "27 · Hardware Detail": vue/screens/27-hardware-detail.md
+          - "28 · Coach Codex": vue/screens/28-coach-codex.md
+          - "29 · Calibration": vue/screens/29-calibration.md
+          - "30 · SQL Console (fullscreen)": vue/screens/30-sql-console-fullscreen.md
+          - "31 · Comparison View": vue/screens/31-comparison-view.md
+          - "32 · Live Spectator": vue/screens/32-live-spectator.md
+          - "36 · Goals Library": vue/screens/36-goals-library.md
+      - "Screens — other":
+          - "11 · Replay": vue/screens/11-replay.md
+          - "14 · End of Day": vue/screens/14-end-of-day.md
+      - "Assets":
+          - "Reference sheet + nano-banana cookbook": vue/assets/reference-sheet-source.md
+          - "Sprite naming convention": vue/assets/sprite-naming-convention.md
+      - "Journal":
+          - "2026-04-29 · RPG × Motocross decision": vue/journal/2026-04-29-rpg-x-motocross-decision.md
+  - Feedback System: feedback-system.md
+  - Driver Profile Metrics: metrics.md
+  - ML Models: ml-models.md
+  - Model Methodology & Results: model-methodology.md
+  - Sprint Plan: sprint-plan.md
+  - ADR:
+      - Overview: adr/index.md
+      - "001: Confidence-Annotated Frame": adr/001-confidence-frame.md
+      - "002: Split-Brain with Arbiter": adr/002-split-brain-arbiter.md
+      - "003: Gemma 4 Edge LLM": adr/003-gemma-edge.md
+      - "004: Antigravity Store-and-Forward": adr/004-antigravity-pipeline.md
+      - "005: Pedagogical Vector Retrieval": adr/005-pedagogical-vectors.md
+      - "006: Sensor Fusion for Racelogic + OBDLink": adr/006-sensor-fusion.md
+      - "007: Event-Sourced Driver Profile": adr/007-event-sourced-profile.md
+      - "008: Rule Regression Testing": adr/008-rule-testing.md
+      - "009: Graceful Degradation": adr/009-graceful-degradation.md
+      - "010: HTTP Bridge as Warm-Path Tier 1": adr/010-http-bridge-warm-path.md
+      - "011: Named-Marker Schema": adr/011-named-marker-schema.md
+      - "012: Coach Engine Adapter": adr/012-coach-engine-adapter.md
+      - "013: Frontend/Backend Boundary": adr/013-frontend-backend-boundary.md
+      - "014: Sonoma is the Product": adr/014-sonoma-as-the-product.md
+      - "015: Universal Telemetry Sink": adr/015-universal-telemetry-sink.md
+      - "016: USB-CAN Ingest + Vue PWA Frontend": adr/016-can-bus-ingest-and-frontend-pivot.md
+      - "017: Three-Tier Coach Architecture": adr/017-three-tier-coach-architecture.md
+      - "018: Field-Readiness + Pedagogy Tuning": adr/018-field-readiness-blockers-and-pedagogy-tuning.md
+      - "019: ADK Multi-Agent Backend": adr/019-adk-multi-agent-backend.md
+      - "020: ADK Agent Architecture Refactor": adr/020-adk-agent-architecture-refactor.md
+      - "021: ADK Second Audit — Runner, Concurrency, Feature Gaps": adr/021-adk-second-audit.md
+      - "022: On-Phone LocalLLM Server (OpenAI-Compatible)": adr/022-openai-compatible-backend-selector.md
+  - ADK Agent Architecture: adk-agent-architecture.md
+  - ADK Implementation Plan: adk-implementation-plan.md

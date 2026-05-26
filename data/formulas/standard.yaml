@@ -1,0 +1,153 @@
+# Shared formula library — referenced by name from per-car configs.
+#
+# Each formula is a pure-arithmetic expression over named inputs.
+# Expressions are parsed with Python's ast module against a strict
+# allowlist (no attribute access, no subscript, no imports, no
+# comprehensions); the only callable names available are the math
+# functions registered in src/pitwall/features/telemetry/formula.py.
+#
+# Adding a new conversion = appending to this file. No Python edits.
+#
+# Convention: `units: [in, out]` is metadata for documentation and
+# (optionally) sanity-checking; the evaluator does not enforce it.
+
+formulas:
+
+  # --- Identity / sign ---------------------------------------------------
+  identity:
+    inputs: [x]
+    expr: "x"
+  negate:
+    inputs: [x]
+    expr: "-x"
+    notes: "Used for PDF §6.2 sign-convention fixes (e.g. vertical_accel on E46)."
+
+  # --- Linear / affine ---------------------------------------------------
+  linear:
+    inputs: [x, a, b]
+    expr: "a * x + b"
+    notes: "y = a*x + b; bind a and b to constants in the signal definition."
+  scale:
+    inputs: [x, a]
+    expr: "a * x"
+  offset:
+    inputs: [x, b]
+    expr: "x + b"
+    notes: "Bias correction (e.g. gyro warm-up offset)."
+
+  # --- Speed -------------------------------------------------------------
+  mph_to_ms:
+    inputs: [x]
+    expr: "x * 0.44704"
+    units: [mph, "m/s"]
+    notes: "1 mile = 1609.344 m exactly → 0.44704 m/s per mph."
+  kmh_to_ms:
+    inputs: [x]
+    expr: "x / 3.6"
+    units: [kmh, "m/s"]
+  ms_to_kmh:
+    inputs: [x]
+    expr: "x * 3.6"
+    units: ["m/s", kmh]
+  ms_to_mph:
+    inputs: [x]
+    expr: "x * 2.2369362920544"
+    units: ["m/s", mph]
+
+  # --- Pressure ----------------------------------------------------------
+  psi_to_bar:
+    inputs: [x]
+    expr: "x * 0.0689476"
+    units: [psi, bar]
+  bar_to_psi:
+    inputs: [x]
+    expr: "x * 14.5038"
+    units: [bar, psi]
+  kpa_to_bar:
+    inputs: [x]
+    expr: "x / 100"
+    units: [kPa, bar]
+  bar_to_kpa:
+    inputs: [x]
+    expr: "x * 100"
+    units: [bar, kPa]
+  psi_to_kpa:
+    inputs: [x]
+    expr: "x * 6.89476"
+    units: [psi, kPa]
+
+  # --- Temperature -------------------------------------------------------
+  f_to_c:
+    inputs: [x]
+    expr: "(x - 32) * 5 / 9"
+    units: [F, C]
+  c_to_f:
+    inputs: [x]
+    expr: "x * 9 / 5 + 32"
+    units: [C, F]
+  c_to_k:
+    inputs: [x]
+    expr: "x + 273.15"
+    units: [C, K]
+  k_to_c:
+    inputs: [x]
+    expr: "x - 273.15"
+    units: [K, C]
+
+  # --- Angle / rotation --------------------------------------------------
+  deg_to_rad:
+    inputs: [x]
+    expr: "x * 0.017453292519943295"
+    units: [deg, rad]
+  rad_to_deg:
+    inputs: [x]
+    expr: "x * 57.29577951308232"
+    units: [rad, deg]
+
+  # --- Volume / fuel -----------------------------------------------------
+  gal_to_l:
+    inputs: [x]
+    expr: "x * 3.785411784"
+    units: [gal, L]
+  l_to_gal:
+    inputs: [x]
+    expr: "x * 0.26417205236"
+    units: [L, gal]
+
+  # --- Vector composition (multi-input) ----------------------------------
+  combo_g:
+    inputs: [glat, glong]
+    expr: "sqrt(glat * glat + glong * glong)"
+    units: [g, g]
+    notes: "Magnitude of the lateral+longitudinal accel vector."
+
+  magnitude_3d:
+    inputs: [x, y, z]
+    expr: "sqrt(x * x + y * y + z * z)"
+    notes: "L2 norm of a 3-axis vector. Useful for total-accel magnitudes."
+
+  mean_2:
+    inputs: [a, b]
+    expr: "(a + b) / 2"
+  mean_4:
+    inputs: [a, b, c, d]
+    expr: "(a + b + c + d) / 4"
+    notes: "Average of 4 wheel speeds, etc."
+
+  # --- Conditional / clamp -----------------------------------------------
+  clamp:
+    inputs: [x, lo, hi]
+    expr: "min(hi, max(lo, x))"
+  deadzone:
+    inputs: [x, threshold]
+    expr: "x if abs(x) > threshold else 0"
+    notes: "Force values near zero to exactly zero (gyro idle drift)."
+
+  # --- Engine / wheel ratios --------------------------------------------
+  # For lookup-based gear estimation use the registered `gear_position`
+  # method instead — formulas are pure arithmetic and can't do table
+  # lookups. This one is just the gear-ratio number, not the gear index.
+  rpm_per_kmh:
+    inputs: [rpm, kmh]
+    expr: "rpm / kmh if kmh > 0 else 0"
+    notes: "Useful proxy for which gear the car is in."

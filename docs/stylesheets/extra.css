@@ -1,0 +1,288 @@
+/* ============================================================
+   Pitwall · Google Developer Stack — landing page styling
+   Scoped to .gds-page so the rest of the docs site is untouched.
+   ============================================================ */
+
+:root {
+  --gds-blue:   #4285F4;
+  --gds-red:    #EA4335;
+  --gds-yellow: #FBBC04;
+  --gds-green:  #34A853;
+  --gds-ink:    #202124;
+  --gds-surface:#2A2B2F;
+  --gds-line:   #3C4043;
+  --gds-text:   #E8EAED;
+  --gds-muted:  #9AA0A6;
+  --gds-radius: 16px;
+  --gds-shadow: 0 1px 2px rgba(0,0,0,.30), 0 4px 18px rgba(0,0,0,.18);
+}
+
+/* ---------- page wrapper ---------- */
+.gds-page {
+  font-family: "Google Sans", "Product Sans", "Roboto", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--gds-text);
+  letter-spacing: -0.005em;
+}
+
+.gds-page h1, .gds-page h2, .gds-page h3 {
+  font-family: "Google Sans", "Product Sans", "Roboto", sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.gds-page h2 {
+  margin-top: 3rem;
+  font-size: 1.85rem;
+}
+
+.gds-page p, .gds-page li {
+  font-size: 1.02rem;
+  line-height: 1.65;
+  color: var(--gds-text);
+}
+
+/* ---------- hero ---------- */
+.gds-hero {
+  background:
+    radial-gradient(1100px 460px at 12% -10%, rgba(66,133,244,.22), transparent 60%),
+    radial-gradient(900px  420px at 92% -5%,  rgba(234,67,53,.16),  transparent 60%),
+    radial-gradient(800px  360px at 50% 110%, rgba(52,168,83,.14),  transparent 60%),
+    var(--gds-ink);
+  border: 1px solid var(--gds-line);
+  border-radius: var(--gds-radius);
+  padding: 3rem 2.4rem 2.6rem;
+  margin: 1rem 0 2.4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.gds-hero .eyebrow {
+  display: inline-block;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--gds-muted);
+  margin-bottom: .7rem;
+}
+
+.gds-hero h1 {
+  font-size: 2.6rem;
+  line-height: 1.1;
+  margin: 0 0 .9rem;
+  font-weight: 500;
+}
+
+.gds-hero h1 .grad {
+  background: linear-gradient(90deg,
+    var(--gds-blue) 0%, var(--gds-red) 35%,
+    var(--gds-yellow) 65%, var(--gds-green) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gds-hero .lede {
+  font-size: 1.15rem;
+  max-width: 780px;
+  color: var(--gds-text);
+  opacity: .92;
+  margin: 0 0 1.6rem;
+}
+
+.gds-hero .cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem;
+  margin-top: 1.2rem;
+}
+
+.gds-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .65rem 1.15rem;
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: .95rem;
+  text-decoration: none !important;
+  border: 1px solid transparent;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.gds-btn-primary {
+  background: var(--gds-blue);
+  color: #fff !important;
+}
+.gds-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(66,133,244,.35); }
+
+.gds-btn-ghost {
+  background: transparent;
+  color: var(--gds-text) !important;
+  border-color: var(--gds-line);
+}
+.gds-btn-ghost:hover { background: rgba(255,255,255,.04); }
+
+/* ---------- chip row under hero ---------- */
+.gds-chips {
+  display: flex; flex-wrap: wrap; gap: .55rem;
+  margin-top: 1.4rem;
+}
+.gds-chip {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .35rem .85rem;
+  font-size: .82rem; font-weight: 500;
+  border-radius: 999px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--gds-line);
+  color: var(--gds-text);
+}
+.gds-chip .dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+.gds-chip.blue   .dot { background: var(--gds-blue); }
+.gds-chip.red    .dot { background: var(--gds-red); }
+.gds-chip.yellow .dot { background: var(--gds-yellow); }
+.gds-chip.green  .dot { background: var(--gds-green); }
+
+/* ---------- card grid ---------- */
+.gds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin: 1.4rem 0 2rem;
+}
+
+.gds-card {
+  background: var(--gds-surface);
+  border: 1px solid var(--gds-line);
+  border-radius: var(--gds-radius);
+  padding: 1.4rem 1.4rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.gds-card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: var(--accent, var(--gds-blue));
+}
+.gds-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,.18);
+  box-shadow: var(--gds-shadow);
+}
+.gds-card .role {
+  font-size: .75rem; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--gds-muted);
+  margin-bottom: .35rem;
+}
+.gds-card h3 {
+  margin: 0 0 .55rem;
+  font-size: 1.18rem;
+  color: var(--gds-text);
+}
+.gds-card p {
+  margin: 0;
+  font-size: .95rem;
+  color: var(--gds-text);
+  opacity: .88;
+}
+
+.gds-card.blue   { --accent: var(--gds-blue); }
+.gds-card.red    { --accent: var(--gds-red); }
+.gds-card.yellow { --accent: var(--gds-yellow); }
+.gds-card.green  { --accent: var(--gds-green); }
+
+/* ---------- per-tool feature blocks ---------- */
+.gds-feature {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 2rem;
+  align-items: start;
+  padding: 2rem 0;
+  border-top: 1px solid var(--gds-line);
+}
+.gds-feature:first-of-type { border-top: 0; }
+
+.gds-feature .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1.6 / 1;
+  border-radius: var(--gds-radius);
+  font-size: 1.4rem;
+  font-weight: 500;
+  font-family: "Google Sans", "Product Sans", sans-serif;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-align: center;
+  background: var(--accent, var(--gds-blue));
+  box-shadow: var(--gds-shadow);
+  position: relative;
+  overflow: hidden;
+}
+.gds-feature .badge::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 70% 20%, rgba(255,255,255,.20), transparent 55%);
+}
+.gds-feature.blue   .badge { --accent: var(--gds-blue); }
+.gds-feature.red    .badge { --accent: var(--gds-red); }
+.gds-feature.yellow .badge { --accent: var(--gds-yellow); color: #202124; }
+.gds-feature.green  .badge { --accent: var(--gds-green); }
+
+.gds-feature h2 {
+  margin: 0 0 .5rem;
+  font-size: 1.6rem;
+}
+.gds-feature .role-tag {
+  display: inline-block;
+  font-size: .72rem; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--gds-muted);
+  margin-bottom: .55rem;
+}
+.gds-feature .stat-row {
+  display: flex; flex-wrap: wrap; gap: 1.2rem;
+  margin: 1rem 0 .2rem;
+}
+.gds-feature .stat .num {
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 600;
+  font-family: "Google Sans", sans-serif;
+  color: var(--gds-text);
+  line-height: 1.1;
+}
+.gds-feature .stat .lbl {
+  font-size: .78rem;
+  color: var(--gds-muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+@media (max-width: 720px) {
+  .gds-feature { grid-template-columns: 1fr; gap: 1rem; }
+  .gds-feature .badge { aspect-ratio: 3 / 1; max-width: 240px; }
+  .gds-hero { padding: 2rem 1.4rem; }
+  .gds-hero h1 { font-size: 2rem; }
+}
+
+/* ---------- closing band ---------- */
+.gds-band {
+  margin-top: 3rem;
+  padding: 2rem;
+  border-radius: var(--gds-radius);
+  background:
+    linear-gradient(135deg, rgba(66,133,244,.10), rgba(52,168,83,.08));
+  border: 1px solid var(--gds-line);
+}
+.gds-band h2 { margin-top: 0; }
+
+/* let Material's headerlinks fade on this page */
+.gds-page .headerlink { opacity: .25; }
+.gds-page .headerlink:hover { opacity: 1; }

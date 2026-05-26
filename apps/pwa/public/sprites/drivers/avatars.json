@@ -1,0 +1,10 @@
+{
+  "frames": {
+    "avatar1_idle_0": { "frame": { "x": 0, "y": 0, "w": 64, "h": 64 }, "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 }, "sourceSize": { "w": 64, "h": 64 } },
+    "avatar1_idle_1": { "frame": { "x": 64, "y": 0, "w": 64, "h": 64 }, "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 64 }, "sourceSize": { "w": 64, "h": 64 } }
+  },
+  "animations": {
+    "idle": { "frames": ["avatar1_idle_0", "avatar1_idle_1"], "fps": 2, "loop": true }
+  },
+  "meta": { "image": "avatars.png" }
+}
