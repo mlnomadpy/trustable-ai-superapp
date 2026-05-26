@@ -1,7 +1,7 @@
 {
   "hosting": {
     "site": "pitwall-4fb12",
-    "public": "apps/pwa/dist",
+    "public": "apps/paddock-dashboard/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
   }

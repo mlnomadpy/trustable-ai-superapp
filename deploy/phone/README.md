@@ -10,10 +10,10 @@ script source for ground truth — this README is a fingerpost.
 |---|---|---|
 | `00-check.sh`            | No  | Verify `adb`, Termux user, root, USB-CAN, LocalLLM. Prints a go/no-go for every dependency. |
 | `10-termux-packages.sh`  | Yes | `pkg install` Python 3.13, git, clang, build deps, `python-pyarrow`, `python-numpy`. SQLite ships with Termux. |
-| `20-stage-repo.sh`       | Yes | `tar` `apps/bridge + apps/simulator + data/`, `adb push`, extract into `~/pitwall` on the phone. |
+| `20-stage-repo.sh`       | Yes | `tar` `apps/edge-daemon + data/`, `adb push`, extract into `~/pitwall` on the phone. |
 | `30-python-deps.sh`      | Yes | Create `~/pitwall/.venv`, `pip install` runtime deps, drop the `termux_system.pth` shim so pyarrow + numpy resolve from Termux's system site-packages. |
 | `40-stage-recording.sh`  | Yes | (Optional) push a `.sqlite` recording for replay. |
-| `50-build-pwa.sh`        | No  | `npm install && npm run build && npx serve -s apps/pwa/dist -l :5173` on the **Mac**. |
+| `50-build-pwa.sh`        | No  | `npm install && npm run build && npx serve -s apps/paddock-dashboard/dist -l :5173` on the **Mac**. |
 | `60-forward-ports.sh`    | No  | `adb reverse tcp:5173 tcp:5173` + `adb forward tcp:8765 tcp:8765`. |
 | `70-start-bridge.sh`     | Yes | Start the bridge under `timeout`. See env knobs below. |
 | `80-open-pwa.sh`         | No  | Launch Chrome on the phone at `http://localhost:5173`. |

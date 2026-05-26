@@ -1,0 +1,35 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Termux runit entrypoint for the LocalLLM server.
+#
+# Mirrors the shape of deploy/termux/service/pitwall-bridge/run so
+# operators can manage both services with the same sv-up / sv-down
+# muscle memory.
+#
+# Honors:
+#   - sv up    | sv down | sv status localllm
+#   - Auto-restart on crash (svc supervises)
+#   - svlogd writes to $HOME/.localllm-logs/ (see log/run)
+#
+# Pre-reqs (run apps/localllm/scripts/install-phone.sh first):
+#   - LocalLLM binary on $PATH (or set LOCALLLM_BIN)
+#   - Gemma 4 E2B int8 weights at $HOME/llms/gemma-4-e2b-q8
+
+set -eu
+
+# ── Env knobs (override in $HOME/.config/localllm/env) ───────────────
+: "${LOCALLLM_BIN:=localllm}"
+: "${LOCALLLM_CONFIG:=$HOME/pitwall/apps/localllm/config/phone.toml}"
+: "${LOCALLLM_HOST:=127.0.0.1}"
+: "${LOCALLLM_PORT:=8080}"
+
+[ -f "$HOME/.config/localllm/env" ] && . "$HOME/.config/localllm/env"
+
+# Use the Termux session for any tools the launcher needs.
+export PATH="/data/data/com.termux/files/usr/bin:$PATH"
+export LD_LIBRARY_PATH="/data/data/com.termux/files/usr/lib:${LD_LIBRARY_PATH:-}"
+
+exec 2>&1
+exec "$LOCALLLM_BIN" serve \
+    --config "$LOCALLLM_CONFIG" \
+    --host "$LOCALLLM_HOST" \
+    --port "$LOCALLLM_PORT"

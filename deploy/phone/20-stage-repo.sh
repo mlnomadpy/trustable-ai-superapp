@@ -23,7 +23,7 @@ tar -czf "$TAR" \
   --exclude='__pycache__' --exclude='*.pyc' --exclude='.venv' \
   --exclude='node_modules' --exclude='*.duckdb' --exclude='*.duckdb.*' \
   -C "$REPO_ROOT" \
-  apps/bridge apps/simulator data
+  apps/edge-daemon data
 ok "tarball: $(ls -lh "$TAR" | awk '{print $5}')"
 
 say "Pushing to /data/local/tmp/…"

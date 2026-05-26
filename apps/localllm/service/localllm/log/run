@@ -1,0 +1,10 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# svlogd writes LocalLLM stdout/stderr here, rotating at 1 MB,
+# keeping 10 historical files. Logs land in $HOME/.localllm-logs/.
+#
+# View live:  tail -f $HOME/.localllm-logs/current
+# View past:  ls -lt $HOME/.localllm-logs/
+
+LOG_DIR="${LOCALLLM_LOG_DIR:-$HOME/.localllm-logs}"
+mkdir -p "$LOG_DIR"
+exec svlogd -tt "$LOG_DIR"

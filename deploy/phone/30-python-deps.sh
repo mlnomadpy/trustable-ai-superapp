@@ -44,7 +44,7 @@ def connect(*a, **kw):
     raise _Unavailable("duckdb not available on this platform")
 __version__ = "0.0.0-stub"
 EOF
-  python -c "import sqlite3, sys; sys.path.insert(0,\"apps/bridge\"); from pitwall.db import db_backend; print(\"db backend:\", db_backend())"
+  python -c "import sqlite3, sys; sys.path.insert(0,\"apps/edge-daemon\"); from pitwall.db import db_backend; print(\"db backend:\", db_backend())"
 '
 
 hr

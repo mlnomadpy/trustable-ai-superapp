@@ -55,7 +55,7 @@ nohup env \
   PITWALL_ADK_OPENAI_API_KEY=local \
   PITWALL_LLM_MAX_TOKENS=512 \
   PITWALL_COMPACT_PROMPTS=1 \
-  PYTHONPATH=apps/bridge \
+  PYTHONPATH=apps/edge-daemon \
   timeout ${DURATION_S} python -m pitwall ${CAN_ARGS} \
     --can-car-config data/cars/bmw_e46_m3.yaml \
     --can-dbc data/dbc/pitwall.dbc \

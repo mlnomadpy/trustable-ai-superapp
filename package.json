@@ -1,12 +1,18 @@
 {
   "name": "trustable-ai-superapp",
   "private": true,
+  "workspaces": [
+    "apps/paddock-dashboard",
+    "packages/core-telemetry/typescript"
+  ],
   "scripts": {
-    "pwa:install": "npm install --prefix apps/pwa",
-    "pwa:dev": "npm run dev --prefix apps/pwa",
-    "pwa:build": "npm install --prefix apps/pwa && npm run build --prefix apps/pwa",
-    "pwa:test": "npm test --prefix apps/pwa",
-    "pwa:deploy": "npm run pwa:build && firebase deploy --only hosting",
+    "dashboard:install": "npm install --workspaces --if-present",
+    "dashboard:dev": "npm run dev --workspace apps/paddock-dashboard",
+    "dashboard:build": "npm run build --workspace apps/paddock-dashboard",
+    "dashboard:test": "npm test --workspace apps/paddock-dashboard",
+    "dashboard:deploy": "npm run dashboard:build && firebase deploy --only hosting",
+    "telemetry:build": "npm run build --workspace packages/core-telemetry/typescript",
+    "telemetry:test": "npm test --workspace packages/core-telemetry/typescript",
     "docs:build": "mkdocs build",
     "docs:serve": "mkdocs serve"
   },

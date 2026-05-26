@@ -1,0 +1,27 @@
+{
+  "name": "@trustable/core-telemetry",
+  "version": "0.1.0",
+  "description": "Shared telemetry schemas + DEL math contracts (TypeScript). Mirror of packages/core-telemetry/python.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  }
+}

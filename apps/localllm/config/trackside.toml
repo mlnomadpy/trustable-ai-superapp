@@ -1,0 +1,32 @@
+# LocalLLM config — trackside laptop / Docker deploy (PRD §6.4).
+#
+# Activated when the cloud-backend can't reach Vertex AI. Holds the
+# QLoRA-fine-tuned Gemma 4 weights and runs cold-path curriculum
+# generation locally.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+log_level = "info"
+
+[model]
+id = "gemma-4-qlora-track-telemetry"
+path = "/opt/llms/gemma-4-qlora"
+# Trackside has more memory than the phone — can run int4 with bigger
+# context for the cold-path debrief generations.
+quantization = "int4"
+
+[runtime]
+target_tokens_per_sec = 40
+min_acceptable_tokens_per_sec = 30
+
+# Cold-path generations summarize a full session, so context is
+# larger here than on the phone. Still bounded — the 50 KB
+# learning-plan cap (PRD §5.5) constrains the *output*.
+max_context_tokens = 8192
+max_completion_tokens = 2048
+
+[delegate]
+prefer = "cuda"
+fallback = "metal"
+banned = []

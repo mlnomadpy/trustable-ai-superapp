@@ -1,0 +1,21 @@
+services:
+  localllm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trustable/localllm-trackside:latest
+    container_name: localllm
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ../config/trackside.toml:/etc/localllm/trackside.toml:ro
+      # Host path holding the QLoRA-fine-tuned weights. Override via
+      # LOCALLLM_WEIGHTS_PATH in your shell.
+      - "${LOCALLLM_WEIGHTS_PATH:-/opt/llms/gemma-4-qlora}:/opt/llms/gemma-4-qlora:ro"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/v1/models"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s

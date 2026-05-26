@@ -10,7 +10,7 @@ source "$HERE/_common.sh"
 hr
 say "Step 50 — build PWA + serve from Mac"
 hr
-PWA_DIR="$REPO_ROOT/apps/pwa"
+PWA_DIR="$REPO_ROOT/apps/paddock-dashboard"
 
 if ! command -v node >/dev/null 2>&1; then
   die "node not on PATH. Install via 'brew install node' (macOS) or https://nodejs.org"

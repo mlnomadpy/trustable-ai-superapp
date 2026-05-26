@@ -1,0 +1,22 @@
+# Root pyproject.toml — declares the uv workspace.
+# Individual Python projects live under apps/* and packages/* with their
+# own pyproject.toml. Running `uv sync` at the repo root resolves the
+# combined dependency graph and writes the lockfile here.
+
+[project]
+name = "trustable-ai-superapp"
+version = "0.1.0"
+description = "Trustable AI racing coach — monorepo umbrella (edge-daemon, cloud-backend, paddock-dashboard, core-telemetry)."
+requires-python = ">=3.12"
+
+[tool.uv.workspace]
+members = [
+    "apps/edge-daemon",
+    "apps/cloud-backend",
+    "packages/core-telemetry/python",
+]
+
+[tool.uv.sources]
+# Workspace members reference each other by name; uv resolves to the
+# local path automatically.
+core-telemetry = { workspace = true }
