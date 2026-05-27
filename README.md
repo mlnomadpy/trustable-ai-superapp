@@ -177,10 +177,10 @@ the SQLite-on-Termux warm path, the no-fake-fallback discipline,
 the Sonoma track intel, the deploy ladder, and the docs we read
 every day.
 
-- **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy)
-- **Vijay Vivekanand** — [@VijayVivekanand](https://github.com/VijayVivekanand)
-- **Aileen Villanueva Lecuona** — [@aileenvl](https://github.com/aileenvl)
-- **Hemanth HM** — [@hemanth](https://github.com/hemanth)
+- **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy) — Google Developer Expert
+- **Vijay Vivekanand** — [@VijayVivekanand](https://github.com/VijayVivekanand) — Google for Startups
+- **Aileen Villanueva Lecuona** — [@aileenvl](https://github.com/aileenvl) — Google Developer Expert
+- **Hemanth HM** — [@hemanth](https://github.com/hemanth) — Google Developer Expert
 
 ### In-car data system — Brian Luc
 
