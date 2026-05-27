@@ -1,5 +1,10 @@
 # `apps/localllm`
 
+> **Upstream:** [`mlnomadpy/localllm`](https://github.com/mlnomadpy/localllm).
+> This folder is **deploy plumbing only** — config, runit service
+> definitions, Docker scaffolding, install scripts, health probes.
+> The actual server binary and inference engine live upstream.
+
 OpenAI-compatible HTTP shim that serves **Gemma-4-e2b** (or any
 locally-quantized model) on `127.0.0.1:8080`. Two deploy modes both
 live here:

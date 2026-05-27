@@ -11,7 +11,7 @@ one repo, one shared contract package.
 | [`apps/edge-daemon/`](apps/edge-daemon/) | Python on Termux/Pixel-10 | In-car logging, hardware parsing (AiM MXP / CAN / VBO), local reflexes. Owns the sub-100ms feedback loop (PRD §7). |
 | [`apps/cloud-backend/`](apps/cloud-backend/) | Python (FastAPI + Vertex AI) | Strategic reasoning, DEL synthesis, cold-path curriculum generation, gold-trace storage. |
 | [`apps/paddock-dashboard/`](apps/paddock-dashboard/) | Vue 3 PWA | Offline-first visualization, historical engine, paddock-mode conversational telemetry (DuckDB-WASM + text-to-SQL). |
-| [`apps/localllm/`](apps/localllm/) | Termux runit / Docker | OpenAI-compatible local model server (Gemma-4-e2b on-phone; QLoRA-fine-tuned Gemma 4 on the trackside laptop for air-gapped fallback per PRD §6.4). |
+| [`apps/localllm/`](apps/localllm/) | Termux runit / Docker | Deploy config + service definitions for the OpenAI-compatible local model server. Upstream: [`mlnomadpy/localllm`](https://github.com/mlnomadpy/localllm) (Gemma-4-e2b on-phone; QLoRA-fine-tuned Gemma 4 on the trackside laptop for air-gapped fallback per PRD §6.4). |
 
 ## Shared package
 
@@ -153,6 +153,10 @@ maintainer and contributor of:
   scripts, and the entire `docs/` tree were all forged there over
   the Sonoma field-test cycle. This repo inherits its source tree
   wholesale.
+- **[`mlnomadpy/localllm`](https://github.com/mlnomadpy/localllm)** —
+  the OpenAI-compatible local model server that every coaching
+  call in this monorepo terminates at. `apps/localllm/` holds the
+  deploy contract; the server itself lives upstream.
 - **`apexai/can_reader`** — early CAN-bus reader prototypes whose
   framing conventions live on in `apps/edge-daemon/pitwall/`.
 - **`trustable-ai-codelab/coachingService`** — the prototype coaching
