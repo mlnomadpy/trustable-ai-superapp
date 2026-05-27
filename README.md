@@ -157,12 +157,14 @@ maintainer and contributor of:
   the OpenAI-compatible local model server that every coaching
   call in this monorepo terminates at. `apps/localllm/` holds the
   deploy contract; the server itself lives upstream.
-- **`apexai/can_reader`** — early CAN-bus reader prototypes whose
-  framing conventions live on in `apps/edge-daemon/pitwall/`.
-- **`trustable-ai-codelab/coachingService`** — the prototype coaching
-  service whose reactive hooks and TTS triggers are being
-  re-implemented as Vue 3 composables in `apps/paddock-dashboard/`
-  per the V2 PRD's frontend-standardization mandate.
+- **[`haruiz/apexai`](https://github.com/haruiz/apexai/)** — the
+  ApexAI codebase whose CAN-bus reader prototypes and framing
+  conventions live on in `apps/edge-daemon/pitwall/`.
+- **[`rabimba/trustable-ai-codelab`](https://github.com/rabimba/trustable-ai-codelab/)** —
+  the prototype coaching service / codelab whose reactive hooks and
+  TTS triggers are being re-implemented as Vue 3 composables in
+  `apps/paddock-dashboard/` per the V2 PRD's frontend-standardization
+  mandate.
 - Any earlier per-pod fragments (Beginner / Intermediate / Advanced)
   whose post-Sonoma post-mortem (PRD §1.2) directly shaped this V2
   architecture.
@@ -177,10 +179,12 @@ the SQLite-on-Termux warm path, the no-fake-fallback discipline,
 the Sonoma track intel, the deploy ladder, and the docs we read
 every day.
 
-- **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy) — Google Developer Expert
 - **Vijay Vivekanand** — [@VijayVivekanand](https://github.com/VijayVivekanand) — Google for Startups
 - **Aileen Villanueva Lecuona** — [@aileenvl](https://github.com/aileenvl) — Google Developer Expert
 - **Hemanth HM** — [@hemanth](https://github.com/hemanth) — Google Developer Expert
+- **Rabimba** — [@rabimba](https://github.com/rabimba)
+- **Henry** — [@haruiz](https://github.com/haruiz)
+- **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy) — Google Developer Expert
 
 ### In-car data system — Brian Luc
 
