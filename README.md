@@ -200,8 +200,8 @@ every day.
 - **Vijay Vivekanand** — [@VijayVivekanand](https://github.com/VijayVivekanand) — Google for Startups
 - **Aileen Villanueva Lecuona** — [@aileenvl](https://github.com/aileenvl) — Google Developer Expert
 - **Hemanth HM** — [@hemanth](https://github.com/hemanth) — Google Developer Expert
-- **Rabimba** — [@rabimba](https://github.com/rabimba)
-- **Henry** — [@haruiz](https://github.com/haruiz)
+- **Rabimba Karanjai** — [@rabimba](https://github.com/rabimba)
+- **Henry Ruiz, PhD** — [@haruiz](https://github.com/haruiz)
 - **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy) — Google Developer Expert
 
 ### Open-source dependencies
