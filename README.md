@@ -169,6 +169,24 @@ maintainer and contributor of:
   whose post-Sonoma post-mortem (PRD §1.2) directly shaped this V2
   architecture.
 
+### In-car data system — Brian Luc
+
+The single thing without which **none** of this exists: **Brian Luc**
+designed the in-car data system that gets telemetry off the car in
+the first place. The AiM MXP / CAN-over-USB-C pipeline every
+downstream component consumes — `apps/edge-daemon`, the
+`packages/core-telemetry` DEL math, the paddock-dashboard's analytics,
+the cloud-backend's cold-path debriefs — all of them ultimately read
+data that exists in software only because of Brian's architecture.
+Thank you, Brian.
+
+### Inspirations + pedagogy
+
+- **Ross Bentley** — the Pedagogical RAG store (PRD §4.2) and the
+  coaching cue vocabulary draw directly from Bentley's
+  performance-driving curriculum. The DEL exists in part to
+  translate that curriculum into machine-actionable structure.
+
 ### The Pitwall team
 
 Every line of the source tree this monorepo inherits came from the
@@ -185,25 +203,6 @@ every day.
 - **Rabimba** — [@rabimba](https://github.com/rabimba)
 - **Henry** — [@haruiz](https://github.com/haruiz)
 - **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy) — Google Developer Expert
-
-### In-car data system — Brian Luc
-
-The single thing without which **none** of this exists: **Brian Luc**
-designed the in-car data system that gets telemetry off the car in
-the first place. The AiM MXP / CAN-over-USB-C pipeline every
-downstream component consumes — `apps/edge-daemon`, the
-`packages/core-telemetry` DEL math, the paddock-dashboard's analytics,
-the cloud-backend's cold-path debriefs — all of them ultimately read
-data that exists in software only because of Brian's architecture.
-Thank you, Brian.
-
-
-### Inspirations + pedagogy
-
-- **Ross Bentley** — the Pedagogical RAG store (PRD §4.2) and the
-  coaching cue vocabulary draw directly from Bentley's
-  performance-driving curriculum. The DEL exists in part to
-  translate that curriculum into machine-actionable structure.
 
 ### Open-source dependencies
 
