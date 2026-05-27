@@ -173,10 +173,12 @@ the SQLite-on-Termux warm path, the no-fake-fallback discipline,
 the Sonoma track intel, the deploy ladder, and the docs we read
 every day.
 
-- **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy)
-- **Vijay Vivekanand** — [@VijayVivekanand](https://github.com/VijayVivekanand)
-- **Aileen Villanueva Lecuona** — [@aileenvl](https://github.com/aileenvl)
-- **Hemanth HM** — [@hemanth](https://github.com/hemanth)
+| Contributor | GitHub | Commits to `mlnomadpy/pitwall` |
+|---|---|---|
+| **Taha Bouhsine** | [@mlnomadpy](https://github.com/mlnomadpy) | 62 |
+| **Vijay Vivekanand** | [@VijayVivekanand](https://github.com/VijayVivekanand) | 33 |
+| **Aileen Villanueva Lecuona** | [@aileenvl](https://github.com/aileenvl) | 16 |
+| **Hemanth HM** | [@hemanth](https://github.com/hemanth) | 8 |
 
 Live contributor graph:
 <https://github.com/mlnomadpy/pitwall/graphs/contributors>
