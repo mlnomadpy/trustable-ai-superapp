@@ -141,6 +141,65 @@ in this repo are the structural answer to:
 - **PRD §7** — safety guardrails (sub-100ms loop, 4-second debounce,
   cryptographic handshake) enforced in `apps/edge-daemon`.
 
+## Acknowledgments
+
+### Predecessor repositories
+
+This monorepo is the V2 consolidation of work that previously lived
+across several focused repositories. We're grateful to every
+maintainer and contributor of:
+
+- **[`mlnomadpy/pitwall`](https://github.com/mlnomadpy/pitwall)** —
+  the immediate predecessor. The Python bridge, the Vue 3 PWA, the
+  Sonoma track intel, the AiM MXP / CAN pipeline, the deploy
+  scripts, and the entire `docs/` tree were all forged there over
+  the Sonoma field-test cycle. This repo inherits its source tree
+  wholesale.
+- **`apexai/can_reader`** — early CAN-bus reader prototypes whose
+  framing conventions live on in `apps/edge-daemon/pitwall/`.
+- **`trustable-ai-codelab/coachingService`** — the prototype coaching
+  service whose reactive hooks and TTS triggers are being
+  re-implemented as Vue 3 composables in `apps/paddock-dashboard/`
+  per the V2 PRD's frontend-standardization mandate.
+- Any earlier per-pod fragments (Beginner / Intermediate / Advanced)
+  whose post-Sonoma post-mortem (PRD §1.2) directly shaped this V2
+  architecture.
+
+### The Pitwall team
+
+Every line of the source tree this monorepo inherits came from the
+people who built and operated
+[`mlnomadpy/pitwall`](https://github.com/mlnomadpy/pitwall) through
+the Sonoma field-test cycle. Thank you for the AiM MXP pipeline,
+the SQLite-on-Termux warm path, the no-fake-fallback discipline,
+the Sonoma track intel, the deploy ladder, and the docs we read
+every day.
+
+- **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy)
+- **Vijay Vivekanand** — [@VijayVivekanand](https://github.com/VijayVivekanand)
+- **Aileen Villanueva Lecuona** — [@aileenvl](https://github.com/aileenvl)
+- **Hemanth HM** — [@hemanth](https://github.com/hemanth)
+
+Live contributor graph:
+<https://github.com/mlnomadpy/pitwall/graphs/contributors>
+
+
+### Inspirations + pedagogy
+
+- **Ross Bentley** — the Pedagogical RAG store (PRD §4.2) and the
+  coaching cue vocabulary draw directly from Bentley's
+  performance-driving curriculum. The DEL exists in part to
+  translate that curriculum into machine-actionable structure.
+
+### Open-source dependencies
+
+This project would not exist without the ecosystems it sits on top
+of: Flask + waitress, DuckDB, Vue, Vite, FastAPI, Pydantic, Ktor,
+LiteRT, cantools, python-can, pyarrow, osmdroid, Vico, and the rest
+of the dependency graph declared in each app's
+`pyproject.toml` / `package.json`. Thanks to all of their
+maintainers.
+
 ## License
 
 Proprietary — see individual files for headers.
