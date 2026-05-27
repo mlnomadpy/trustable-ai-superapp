@@ -203,6 +203,7 @@ every day.
 - **Rabimba Karanjai** — [@rabimba](https://github.com/rabimba)
 - **Henry Ruiz, PhD** — [@haruiz](https://github.com/haruiz)
 - **Taha Bouhsine** — [@mlnomadpy](https://github.com/mlnomadpy) — Google Developer Expert
+- **Simon Margolis**
 
 ### Open-source dependencies
 
