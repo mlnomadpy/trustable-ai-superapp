@@ -125,8 +125,6 @@ V2 product requirements live in the team's PRD (Trustable AI Racing
 Coach Super App V2, Rev 3). The four apps + core-telemetry package
 in this repo are the structural answer to:
 
-- **PRD §2** — monorepo + GDE / Strike Agency / Founder governance
-  topology.
 - **PRD §3** — hardware-acceleration / TPU optimization contract
   (the 20–40 tok/s gate lives in `apps/localllm/config/phone.toml`).
 - **PRD §4** — Domain Expertise Layer (codified in
@@ -182,6 +180,17 @@ every day.
 
 Live contributor graph:
 <https://github.com/mlnomadpy/pitwall/graphs/contributors>
+
+### In-car data system — Brian Luc
+
+The single thing without which **none** of this exists: **Brian Luc**
+designed the in-car data system that gets telemetry off the car in
+the first place. The AiM MXP / CAN-over-USB-C pipeline every
+downstream component consumes — `apps/edge-daemon`, the
+`packages/core-telemetry` DEL math, the paddock-dashboard's analytics,
+the cloud-backend's cold-path debriefs — all of them ultimately read
+data that exists in software only because of Brian's architecture.
+Thank you, Brian.
 
 
 ### Inspirations + pedagogy
