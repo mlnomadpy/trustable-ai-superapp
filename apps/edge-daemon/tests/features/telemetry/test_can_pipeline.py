@@ -135,17 +135,25 @@ def test_round_trip_motion_frame_sinks_to_wide_table(reader, producer_bus, db):
     _send(producer_bus, db, "AimExtended08_Analog20", _ANALOG20, t=1000.015)
     _send(producer_bus, db, "SmartyCam04", _SC04, t=1000.020)
 
-    time.sleep(0.5)
-    reader._flush_wide(force=True)
-
-    conn = br.get_db()
-    row = conn.execute(
-        "SELECT speed_ms, g_lat, g_long, combo_g, "
-        "       throttle_pct, brake_bar, steering_deg, rpm "
-        "FROM telemetry WHERE session_id = ? ORDER BY frame_idx DESC LIMIT 1",
-        ["test-can-001"],
-    ).fetchone()
-    conn.close()
+    # The reader consumes frames on a separate thread, so poll until the
+    # accumulated wide row carries the last-arriving canonical (steering_deg
+    # from SmartyCam04) instead of relying on a fixed sleep — CI runners can
+    # be slow enough that a single 0.5 s wait races the consumer thread.
+    row = None
+    deadline = time.time() + 8.0
+    while time.time() < deadline:
+        time.sleep(0.2)
+        reader._flush_wide(force=True)
+        conn = br.get_db()
+        row = conn.execute(
+            "SELECT speed_ms, g_lat, g_long, combo_g, "
+            "       throttle_pct, brake_bar, steering_deg, rpm "
+            "FROM telemetry WHERE session_id = ? ORDER BY frame_idx DESC LIMIT 1",
+            ["test-can-001"],
+        ).fetchone()
+        conn.close()
+        if row is not None and abs((row[6] or 0.0) - (-3.2)) < 0.05:
+            break
 
     assert row is not None
     assert abs(row[0] - 27.7165) < 0.02    # speed_ms (62 mph)
