@@ -257,42 +257,47 @@ FRAME_PLAN = [
         ("gear", "gear"),
         ("water_temp_f", "water_temp_f"),
     ]),
+    # Standard SmartyCam stream: the IMU / pressure / pedal slots are the
+    # cosmetic `_std` mirrors per data/dbc/pitwall.dbc (the authoritative
+    # values live in the AimExtended frames below). The simulator fills the
+    # std slots with the same profile values so a decoder sees coherent data.
     (0x421, "SmartyCam02", 50.0, [
         ("water_press_psi", "water_press_psi"),
-        ("roll_rate_degs", "roll_rate_degs"),
-        ("oil_temp_f", "oil_filter_temp_f"),       # DBC name vs PDF name
-        ("oil_press_psi", "oil_press_psi"),
+        ("roll_rate_degs_std", "roll_rate_degs"),
+        ("oil_filter_temp_f_std", "oil_filter_temp_f"),
+        ("oil_press_psi_std", "oil_press_psi"),
     ]),
     (0x422, "SmartyCam03", 50.0, [
-        ("brake_press_psi", "brake_press_psi"),
-        ("throttle_pos_pct", "pedal_pos_pct"),     # DBC name vs PDF name
-        ("brake_switch", "brake_switch"),
-        ("pitch_rate_degs", "pitch_rate_degs"),
+        ("brake_press_psi_std", "brake_press_psi"),
+        ("throttle_pos_pct_std", "pedal_pos_pct"),
+        ("brake_switch_std", "brake_switch"),
+        ("pitch_rate_degs_std", "pitch_rate_degs"),
     ]),
     (0x423, "SmartyCam04", 50.0, [
-        ("steer_angle_deg", "steer_angle_deg"),
-        ("yaw_rate_degs", "yaw_rate_degs"),
-        ("lateral_accel_g", "lateral_accel_g"),
-        ("inline_accel_g", "inline_accel_g"),
+        ("steer_angle_deg", "steer_angle_deg"),     # authoritative in std stream
+        ("yaw_rate_degs_std", "yaw_rate_degs"),
+        ("lateral_accel_g_std", "lateral_accel_g"),
+        ("inline_accel_g_std", "inline_accel_g"),
     ]),
     (0x424, "SmartyCam05", 50.0, [
-        ("fuel_level_gal", "fuel_level_gal"),
-        ("battery_volt", "battery_volt"),
-        ("vertical_accel_g", "vertical_accel_g"),
+        ("fuel_level_gal_std", "fuel_level_gal"),
+        ("battery_volt", "battery_volt"),           # authoritative in std stream
+        ("vertical_accel_g_std", "vertical_accel_g"),
     ]),
-    (0x450, "AimExtended01", 10.0, [
+    # Extended ECU/IMU/analog stream — the authoritative AiM frames.
+    (0x451, "AimExtended02_WheelSpeeds", 10.0, [
         ("wheel_speed_fl_mph", "wheel_speed_fl_mph"),
         ("wheel_speed_fr_mph", "wheel_speed_fr_mph"),
         ("wheel_speed_rl_mph", "wheel_speed_rl_mph"),
         ("wheel_speed_rr_mph", "wheel_speed_rr_mph"),
     ]),
-    (0x451, "AimExtended02", 10.0, [
-        ("ecu_speed_mph", "ecu_speed_mph"),
-        ("ambient_temp_f", "ambient_temp_f"),
+    (0x452, "AimExtended03_ECU3", 10.0, [
         ("engine_oil_temp_f", "engine_oil_temp_f"),
-        ("dsc_reg", "dsc_reg"),
+        ("ambient_temp_f", "ambient_temp_f"),
+        ("steer_angle_deg_ext", "steer_angle_deg"),
+        ("pedal_pos_pct", "pedal_pos_pct"),
     ]),
-    (0x452, "AimExtended03", 20.0, [
+    (0x459, "AimExtended10_GPS", 20.0, [
         ("gps_lat", "gps_lat"),
         ("gps_lon", "gps_lon"),
     ]),

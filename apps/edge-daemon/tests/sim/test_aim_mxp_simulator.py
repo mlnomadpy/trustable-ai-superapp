@@ -145,7 +145,6 @@ def db():
     return cantools.database.load_file(str(DEFAULT_DBC))
 
 
-@pytest.mark.xfail(reason="targets pre-AiM 8-frame synthetic simulator/DBC; needs rewrite to the 20-frame AiM MXP schema (ADR-016)", strict=False)
 def test_frame_plan_messages_exist_in_dbc(db, profile: LapProfile):
     profile_vals = profile.at(0.0)
     for frame_id, msg_name, rate_hz, sig_map in FRAME_PLAN:
@@ -183,7 +182,6 @@ def virtual_channel(request):
     return f"aim_mxp_sim_test_{request.node.name}"
 
 
-@pytest.mark.xfail(reason="targets pre-AiM 8-frame synthetic simulator/DBC; needs rewrite to the 20-frame AiM MXP schema (ADR-016)", strict=False)
 def test_simulator_emits_all_eight_frames(virtual_channel, db):
     """Smoke test: start the simulator, drain the bus for 2 s, confirm
     every documented AiM MXP frame ID arrives at the receiver."""
@@ -203,12 +201,14 @@ def test_simulator_emits_all_eight_frames(virtual_channel, db):
         bus.shutdown()
     finally:
         sim.stop(timeout=1.0)
-    expected = {0x420, 0x421, 0x422, 0x423, 0x424, 0x450, 0x451, 0x452}
+    # The 8 frames the FRAME_PLAN emits: SmartyCam01-05 (std stream) plus
+    # the authoritative AimExtended wheel-speeds (0x451), ECU3 (0x452), and
+    # GPS (0x459).
+    expected = {0x420, 0x421, 0x422, 0x423, 0x424, 0x451, 0x452, 0x459}
     missing = expected - ids_seen
     assert not missing, f"frames not seen on bus: {[hex(m) for m in missing]}"
 
 
-@pytest.mark.xfail(reason="targets pre-AiM 8-frame synthetic simulator/DBC; needs rewrite to the 20-frame AiM MXP schema (ADR-016)", strict=False)
 def test_simulator_encoded_values_round_trip(virtual_channel, db):
     """Capture a sample of 0x424 (fuel/battery/vertical_accel) and 0x423
     (steering/yaw/lat/inline) from the bus, decode with the DBC, and
@@ -247,7 +247,9 @@ def test_simulator_encoded_values_round_trip(virtual_channel, db):
     # rounding tolerance is ~0.01. Lateral / steering similar.
     # We can't time-align against profile.at(t) exactly because of
     # threading skew, so just check the values are in sensible ranges.
-    v_accel = decoded_424["vertical_accel_g"]
+    # SmartyCam05/04 carry the cosmetic `_std` IMU mirrors (the DBC suffixes
+    # the standard-stream slots; authoritative IMU lives in 0x455/0x456).
+    v_accel = decoded_424["vertical_accel_g_std"]
     assert -1.2 < v_accel < -0.7, (
         f"vertical_accel decode {v_accel} not gravity-shaped"
     )
@@ -255,13 +257,12 @@ def test_simulator_encoded_values_round_trip(virtual_channel, db):
     bv = decoded_424["battery_volt"]
     assert 13.5 < bv < 14.5, f"battery_volt decode {bv} out of range"
     # Fuel level should be close to fuel_start_gal=14.0 (drains slowly)
-    fg = decoded_424["fuel_level_gal"]
+    fg = decoded_424["fuel_level_gal_std"]
     assert 13.0 < fg < 14.1, f"fuel_level decode {fg} out of range"
     # Lateral accel can be anywhere in [-1.4, 1.4] g per the lap shape
-    assert abs(decoded_423["lateral_accel_g"]) < 1.5
+    assert abs(decoded_423["lateral_accel_g_std"]) < 1.5
 
 
-@pytest.mark.xfail(reason="targets pre-AiM 8-frame synthetic simulator/DBC; needs rewrite to the 20-frame AiM MXP schema (ADR-016)", strict=False)
 def test_simulator_clean_lifecycle(virtual_channel):
     """start() → stop() leaves no background thread."""
     sim = AimMxpSimulator(interface="virtual", channel=virtual_channel)
@@ -272,7 +273,6 @@ def test_simulator_clean_lifecycle(virtual_channel):
     assert not sim._thread.is_alive()
 
 
-@pytest.mark.xfail(reason="targets pre-AiM 8-frame synthetic simulator/DBC; needs rewrite to the 20-frame AiM MXP schema (ADR-016)", strict=False)
 def test_simulator_stop_idempotent(virtual_channel):
     """Calling stop() twice doesn't blow up."""
     sim = AimMxpSimulator(interface="virtual", channel=virtual_channel)
@@ -282,7 +282,6 @@ def test_simulator_stop_idempotent(virtual_channel):
     sim.stop(timeout=2.0)  # no-op
 
 
-@pytest.mark.xfail(reason="targets pre-AiM 8-frame synthetic simulator/DBC; needs rewrite to the 20-frame AiM MXP schema (ADR-016)", strict=False)
 def test_simulator_speed_x_changes_rate(virtual_channel):
     """speed_x > 1 should produce frames at higher wall-time rates."""
     sim_slow = AimMxpSimulator(
