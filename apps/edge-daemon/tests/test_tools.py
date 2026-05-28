@@ -5,9 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "src"))
+ROOT = Path(__file__).resolve().parents[1]          # apps/edge-daemon
+REPO_ROOT = Path(__file__).resolve().parents[3]      # repo root (scripts/ lives here)
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+sys.path.insert(0, str(ROOT))                        # → import pitwall
 
 import enrich_sonoma_track as enrich_mod
 import best_sonoma_lap as ranker

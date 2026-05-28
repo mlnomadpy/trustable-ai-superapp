@@ -26,8 +26,13 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
 
+    # `dev` / `can` extras live on the edge-daemon (pitwall) member, not the
+    # workspace-root umbrella — scope the sync to that package.
     - name: Install dependencies
-      run: uv sync --extra dev --extra can
+      run: uv sync --package edge-daemon --extra dev --extra can
 
+    # edge-daemon's pytest config (testpaths, pythonpath) is relative to its
+    # own dir, so run from there.
     - name: Run tests with pytest
-      run: uv run pytest
+      run: uv run --package edge-daemon pytest
+      working-directory: apps/edge-daemon

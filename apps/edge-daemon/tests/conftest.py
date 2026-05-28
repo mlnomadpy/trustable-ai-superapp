@@ -15,8 +15,9 @@ from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+ROOT = Path(__file__).resolve().parents[1]          # apps/edge-daemon
+sys.path.insert(0, str(ROOT))                        # → import pitwall
+sys.path.insert(0, str(ROOT / "simulator"))          # → import aim_mxp_simulator, can_simulator
 
 # Data fixtures live at the monorepo root after the V2 consolidation. The
 # `data/` tree was never moved under `apps/edge-daemon/`, so test paths

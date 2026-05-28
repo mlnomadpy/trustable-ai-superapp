@@ -161,8 +161,14 @@ def coach_debrief():
         if adk_narrative.strip():
             bundle["narrative"] = adk_narrative
             bundle["narrative_source"] = "adk"
-    except (ConnectionError, TimeoutError, OSError, RuntimeError, json.JSONDecodeError) as _e:
-        log.warning("ADK debrief failed (%s: %s)", type(_e).__name__, _e)
+    except Exception as _e:
+        # The LLM is best-effort here: the analyzer bundle is already a valid
+        # debrief. ADK now always attempts LocalLLM (ADR-024), so when the
+        # server is unreachable litellm raises APIConnectionError /
+        # InternalServerError (not an OSError subclass). Any failure → keep
+        # the analyzer bundle and log; never 500 because the LLM is down.
+        log.warning("ADK debrief failed (%s: %s) — using analyzer bundle",
+                    type(_e).__name__, _e)
     with state.bundles_lock: state.session_bundles[sid] = bundle
     if persist and driver_id and state.has_duckdb:
         try:
@@ -299,8 +305,11 @@ def coach_brief():
         narrative, _em_val = extract_emotion(narrative)
         if _em_val != "neutral": emotion = _em_val
         adk_succeeded = True
-    except (ConnectionError, TimeoutError, OSError, RuntimeError, json.JSONDecodeError) as _e:
-        log.warning("ADK brief failed (%s: %s)", type(_e).__name__, _e)
+    except Exception as _e:
+        # ADK always attempts LocalLLM (ADR-024); an unreachable server
+        # raises litellm APIConnectionError (not OSError). Any failure →
+        # fall through to the RuleCoach/templated brief below, never 500.
+        log.warning("ADK brief failed (%s: %s) — falling back", type(_e).__name__, _e)
     if not adk_succeeded:
         if hasattr(state.coach, "brief"):
             try:

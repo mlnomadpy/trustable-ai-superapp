@@ -61,7 +61,8 @@ import can
 import cantools
 
 
-ROOT = Path(__file__).resolve().parents[2]
+# simulator → edge-daemon → apps → repo root. data/ lives at the repo root.
+ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DBC = ROOT / "data" / "dbc" / "pitwall.dbc"
 
 

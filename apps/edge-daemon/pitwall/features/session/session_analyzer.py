@@ -99,7 +99,8 @@ def analyze_session(
     using sonoma.* paths if not specified.
     """
     if repo_root is None:
-        repo_root = Path(__file__).resolve().parents[4]
+        # session → features → pitwall → edge-daemon → apps → repo root.
+        repo_root = Path(__file__).resolve().parents[5]
     if track_json_path is None:
         track_json_path = str(repo_root / sonoma.TRACK_JSON_RELATIVE)
     if gold_path is None:

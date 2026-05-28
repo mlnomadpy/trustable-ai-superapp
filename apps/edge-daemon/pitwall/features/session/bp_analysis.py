@@ -111,7 +111,7 @@ def session_map(sid: str):
 
     pins = []
     try:
-        track_path = os.path.join(SIM_DIR, "..", "..", "data", "tracks", "sonoma.json")
+        track_path = os.path.join(SIM_DIR, "..", "..", "..", "data", "tracks", "sonoma.json")
         track_path = os.path.abspath(track_path)
         with open(track_path) as f:
             data = json.load(f)

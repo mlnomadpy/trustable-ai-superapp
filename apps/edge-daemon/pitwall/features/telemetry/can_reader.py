@@ -63,7 +63,9 @@ from typing import Optional
 import can
 import cantools
 
-ROOT = Path(__file__).resolve().parents[4]
+# telemetry → features → pitwall → edge-daemon → apps → repo root.
+# data/ (dbc, cars) lives at the repo root post-V2-consolidation.
+ROOT = Path(__file__).resolve().parents[5]
 
 from pitwall.dead_reckoning import DeadReckoner, DeadReckonerConfig
 from pitwall.features.telemetry.car_config import CarConfig, load_car_config

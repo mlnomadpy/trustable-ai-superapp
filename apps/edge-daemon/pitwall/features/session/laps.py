@@ -131,7 +131,7 @@ def _laps_via_gps_crossing(rows: list) -> list:
     sonoma = state.sonoma
 
     track_path = os.path.abspath(os.path.join(
-        SIM_DIR, "..", "..", "data", "tracks", "sonoma.json",
+        SIM_DIR, "..", "..", "..", "data", "tracks", "sonoma.json",
     ))
     sf_lat = sonoma.SF_LAT
     sf_lon = sonoma.SF_LON
@@ -202,7 +202,7 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 def _track_length_m() -> float:
     """Resolve TRACK_LEN_M from data/tracks/sonoma_real_gps.json then
     sonoma.json then fall back to 4060 (Sonoma)."""
-    base = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "data", "tracks"))
+    base = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "..", "data", "tracks"))
     for fname in ("sonoma_real_gps.json", "sonoma.json"):
         path = os.path.join(base, fname)
         try:

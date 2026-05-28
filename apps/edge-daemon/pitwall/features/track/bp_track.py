@@ -144,7 +144,7 @@ def session_corners(sid: str):
     gold_by_corner = {}
     try:
         from pitwall.features.track.gold_standard import load_gold_standard
-        gold_path = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "data", "reference", "sonoma_gold.json"))
+        gold_path = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "..", "data", "reference", "sonoma_gold.json"))
         if os.path.exists(gold_path):
             gold = load_gold_standard(gold_path)
             for cp in (gold.corner_passes if hasattr(gold, "corner_passes") else []):
@@ -257,7 +257,7 @@ def session_corners(sid: str):
 @bp.route("/track/markers", methods=["GET"])
 def track_markers():
     """All Sonoma markers."""
-    track_path = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "data", "tracks", "sonoma.json"))
+    track_path = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "..", "data", "tracks", "sonoma.json"))
     try:
         with open(track_path) as f:
             data = json.load(f)
@@ -292,7 +292,7 @@ def track_weather():
 @bp.route("/markers", methods=["GET"])
 def markers_filtered():
     """Filterable view over the Sonoma marker schema (ADR-011)."""
-    track_path = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "data", "tracks", "sonoma.json"))
+    track_path = os.path.abspath(os.path.join(SIM_DIR, "..", "..", "..", "data", "tracks", "sonoma.json"))
     try:
         with open(track_path) as fh:
             data = json.load(fh)
