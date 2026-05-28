@@ -25,8 +25,10 @@ from pitwall.state import state
 bp = Blueprint("cars", __name__)
 
 
-# Repo root: src/pitwall/features/bp_cars.py → up 3 = repo root
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+# Repo root: apps/edge-daemon/pitwall/features/bp_cars.py → up 4 = repo root
+# (features → pitwall → edge-daemon → apps → repo root). data/ lives at the
+# repo root post-V2-consolidation, not under apps/.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 _CARS_DIR = _REPO_ROOT / "data" / "cars"
 
 

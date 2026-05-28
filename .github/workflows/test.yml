@@ -26,8 +26,16 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
 
+    # `dev` / `can` extras live on the edge-daemon member, not the
+    # workspace-root umbrella — scope the sync to that package. `--package`
+    # takes the package NAME (`pitwall`), not the directory.
     - name: Install dependencies
-      run: uv sync --extra dev --extra can
+      run: uv sync --package pitwall --extra dev --extra can
 
+    # pitwall's pytest config (testpaths, pythonpath) is relative to its own
+    # dir, so run from there. `--no-sync` reuses the env synced above —
+    # without it, uv run would re-sync without the dev/can extras and drop
+    # pytest/cantools.
     - name: Run tests with pytest
-      run: uv run pytest
+      run: uv run --no-sync pytest
+      working-directory: apps/edge-daemon

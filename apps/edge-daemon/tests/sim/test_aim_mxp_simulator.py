@@ -31,8 +31,8 @@ import pytest
 # src/simulator/ has no __init__.py and conftest only adds src/ to
 # sys.path. Add the simulator dir so `import aim_mxp_simulator` works
 # as a flat module (same trick test_can_pipeline.py uses).
-ROOT = Path(__file__).resolve().parents[2]
-_SIM_DIR = ROOT / "src" / "simulator"
+ROOT = Path(__file__).resolve().parents[2]          # apps/edge-daemon
+_SIM_DIR = ROOT / "simulator"
 if str(_SIM_DIR) not in sys.path:
     sys.path.insert(0, str(_SIM_DIR))
 
@@ -201,7 +201,10 @@ def test_simulator_emits_all_eight_frames(virtual_channel, db):
         bus.shutdown()
     finally:
         sim.stop(timeout=1.0)
-    expected = {0x420, 0x421, 0x422, 0x423, 0x424, 0x450, 0x451, 0x452}
+    # The 8 frames the FRAME_PLAN emits: SmartyCam01-05 (std stream) plus
+    # the authoritative AimExtended wheel-speeds (0x451), ECU3 (0x452), and
+    # GPS (0x459).
+    expected = {0x420, 0x421, 0x422, 0x423, 0x424, 0x451, 0x452, 0x459}
     missing = expected - ids_seen
     assert not missing, f"frames not seen on bus: {[hex(m) for m in missing]}"
 
@@ -244,7 +247,9 @@ def test_simulator_encoded_values_round_trip(virtual_channel, db):
     # rounding tolerance is ~0.01. Lateral / steering similar.
     # We can't time-align against profile.at(t) exactly because of
     # threading skew, so just check the values are in sensible ranges.
-    v_accel = decoded_424["vertical_accel_g"]
+    # SmartyCam05/04 carry the cosmetic `_std` IMU mirrors (the DBC suffixes
+    # the standard-stream slots; authoritative IMU lives in 0x455/0x456).
+    v_accel = decoded_424["vertical_accel_g_std"]
     assert -1.2 < v_accel < -0.7, (
         f"vertical_accel decode {v_accel} not gravity-shaped"
     )
@@ -252,10 +257,10 @@ def test_simulator_encoded_values_round_trip(virtual_channel, db):
     bv = decoded_424["battery_volt"]
     assert 13.5 < bv < 14.5, f"battery_volt decode {bv} out of range"
     # Fuel level should be close to fuel_start_gal=14.0 (drains slowly)
-    fg = decoded_424["fuel_level_gal"]
+    fg = decoded_424["fuel_level_gal_std"]
     assert 13.0 < fg < 14.1, f"fuel_level decode {fg} out of range"
     # Lateral accel can be anywhere in [-1.4, 1.4] g per the lap shape
-    assert abs(decoded_423["lateral_accel_g"]) < 1.5
+    assert abs(decoded_423["lateral_accel_g_std"]) < 1.5
 
 
 def test_simulator_clean_lifecycle(virtual_channel):

@@ -32,8 +32,13 @@ SIM_DIR = os.path.abspath(
 if SIM_DIR not in sys.path:
     sys.path.insert(0, SIM_DIR)
 
-# Project root for resolving data/ paths
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+# Monorepo root for resolving shared data/ paths. The `data/` tree lives
+# at the repo root, not under apps/edge-daemon/, after the V2 consolidation.
+# From apps/edge-daemon/pitwall/state.py that's three levels up
+# (pitwall → edge-daemon → apps → repo root).
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
 
 # DuckDB lives in data/
 DB_PATH = os.path.join(PROJECT_ROOT, "data", "pitwall_sessions.duckdb")
@@ -87,7 +92,6 @@ class BridgeState:
         self.has_coach: bool = False
         self.has_analyzer: bool = False
         self.has_duckdb: bool = False
-        self.has_adk: bool = False
 
         # ── Namespace handles (set during init) ────────────────────────────
         # `sonoma` is a module handle — callers do `state.sonoma.DANGER_ZONES`.
@@ -152,26 +156,15 @@ class BridgeState:
         except Exception as e:
             log.warning("DB schema init failed: %s", e)
 
-        # ── ADK multi-agent backend (google-adk is genuinely optional) ─────
-        # adk_agents imports google.adk at module top; an ImportError here
-        # means the SDK isn't installed. First-party bugs in adk_agents
-        # itself will still crash because the module body executes on import.
-        try:
-            from pitwall.features.coaching.adk_agents import (
-                coach_orchestrator,
-                HAS_ADK as _adk_loaded,
-                AGENT_REGISTRY,
-            )
-            self.adk_orchestrator = coach_orchestrator
-            self.adk_agent_registry = AGENT_REGISTRY
-            self.has_adk = _adk_loaded and coach_orchestrator is not None
-            if self.has_adk:
-                log.info("✓  ADK coach_orchestrator loaded — %d agents (LiteRT-LM E4B)",
-                         len(AGENT_REGISTRY))
-            else:
-                log.warning("adk_agents imported but google-adk not installed — ADK disabled")
-        except ImportError as e:
-            log.warning("adk_agents not importable (%s) — ADK disabled", e)
+        # ── ADK multi-agent backend (required base dep — ADR-024) ──────────
+        from pitwall.features.coaching.adk_agents import (
+            coach_orchestrator,
+            AGENT_REGISTRY,
+        )
+        self.adk_orchestrator = coach_orchestrator
+        self.adk_agent_registry = AGENT_REGISTRY
+        log.info("✓  ADK coach_orchestrator loaded — %d agents (LocalLLM)",
+                 len(AGENT_REGISTRY))
 
 
 # Module-level singleton — all Blueprints import this.

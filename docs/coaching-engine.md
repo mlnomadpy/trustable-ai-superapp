@@ -5,10 +5,10 @@ Three layers, one arbiter. Phone-shipping state (2026-05-26):
 | Layer | What it is | Phone status |
 |---|---|---|
 | **sonic_model + RuleCoach** | Per-burst rule engine that consumes telemetry, emits `AudioCue` objects, and routes them through `cue_renderer.py`. Hot path, deterministic, no LLM. | **Active.** |
-| **LitertCoach** | Gemma-4-E2B via HTTP to LocalLLM (OpenAI-compatible). Drives `brief()` / `debrief()`; `propose()` defers to `RuleCoach`. | **Active** (LocalLLM at `127.0.0.1:8080/v1`). |
-| **ADK multi-agent** | 17 specialist agents over Gemma-4 via `google-adk`. Powers `/coach/ask`, `/coach/agents`, `/coach/traces`. | **NOT installed.** `google-adk` has no `android_arm64_v8a` wheels for `cffi`/`cryptography`/`watchdog`/`pydantic-core` and `adb su` exec has broken DNS. 16 MB of pre-staged ADK wheels live at `~/adk-wheels` on the phone for offline install once DNS is back. |
+| **LitertCoach** | Gemma-4-E2B via HTTP to LocalLLM (OpenAI-compatible). Drives `brief()` / `debrief()`; `propose()` defers to `RuleCoach`. Sole transport per [ADR-025](adr/025-warm-path-localllm-only.md). | **Active** (LocalLLM at `127.0.0.1:8099/v1`). |
+| **ADK multi-agent** | 23 specialist agents over Gemma-4 via `google-adk` (phase-2 expansion 2026-05-28 per [ADR-026](adr/026-phase2-agent-expansion.md) — 17 V1 + 6 AiM-aware: tire / handling / engine health / traction / input quality / safety). Powers `/coach/ask`, `/coach/agents`, `/coach/traces`. `google-adk` + `litellm` are base deps per [ADR-024](adr/024-localllm-sole-llm-transport.md) — the bridge fails to start without them. | **Active** once ADK wheels are installed in the bridge venv. |
 
-`/coach/agents` and `/coach/ask` return honest `{available: false, reason: "google-adk not installed"}` until the wheels are installed. See [`adk-agent-architecture.md`](adk-agent-architecture.md) for the full ADK design.
+See [`adk-agent-architecture.md`](adk-agent-architecture.md) for the full ADK design.
 
 ---
 
@@ -27,8 +27,10 @@ table.
 
 ## Warm path — `LitertCoach` over LocalLLM
 
-`src/pitwall/features/coaching/litert_coach.py` is the LLM-driven brief/debrief
-class. Construction reads:
+`apps/edge-daemon/pitwall/features/coaching/litert_coach.py` is the LLM-driven
+brief/debrief class. Per [ADR-025](adr/025-warm-path-localllm-only.md) it is
+LocalLLM-only — POSTs to `/v1/chat/completions` via stdlib `urllib.request`.
+Construction reads:
 
 | Env | Default | Meaning |
 |---|---|---|
@@ -79,16 +81,18 @@ When the LLM is healthy and parsed, `error` is `null`.
 
 ---
 
-## Paddock path — ADK (when installed)
+## Paddock path — ADK
 
-The `PITWALL_ADK_BACKEND` selector chooses one of three transports for the
-ADK model client. The phone uses `openai` (HTTP → LocalLLM). See
-[`adk-agent-architecture.md`](adk-agent-architecture.md) for the agent
+ADK is a base dependency of `apps/edge-daemon` (per
+[ADR-024](adr/024-localllm-sole-llm-transport.md)); the bridge fails to
+start without it. The ADK model client is a `LiteLlm` instance dialling
+LocalLLM at `PITWALL_ADK_OPENAI_URL` (default `http://127.0.0.1:8099/v1`).
+See [`adk-agent-architecture.md`](adk-agent-architecture.md) for the agent
 catalogue, intent classifier, pipelines, and the `agent_traces` schema.
 
-`/coach/traces?session_id=&limit=&since_ts=` (new) returns recent rows from
-the `agent_traces` DuckDB table for HUD visualisation. Always HTTP 200 even
-when ADK or DuckDB is absent — the `available` flag tells the caller.
+`/coach/traces?session_id=&limit=&since_ts=` returns recent rows from the
+`agent_traces` DuckDB table for HUD visualisation. Always HTTP 200 even
+when DuckDB is absent — the `available` flag tells the caller.
 
 ---
 

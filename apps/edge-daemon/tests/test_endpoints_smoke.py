@@ -23,9 +23,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
-sys.path.insert(0, str(ROOT / "src" / "simulator"))
+ROOT = Path(__file__).resolve().parents[1]          # apps/edge-daemon
+sys.path.insert(0, str(ROOT))                        # → import pitwall
+sys.path.insert(0, str(ROOT / "simulator"))          # → import can_simulator, aim_mxp_simulator
 
 
 DEFAULT_VBO = "/Users/tahabsn/Documents/GitHub/forza/data/Sonoma Intermediate - 1_47.5.vbo"

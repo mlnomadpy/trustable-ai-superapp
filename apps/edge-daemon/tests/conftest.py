@@ -15,8 +15,14 @@ from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+ROOT = Path(__file__).resolve().parents[1]          # apps/edge-daemon
+sys.path.insert(0, str(ROOT))                        # → import pitwall
+sys.path.insert(0, str(ROOT / "simulator"))          # → import aim_mxp_simulator, can_simulator
+
+# Data fixtures live at the monorepo root after the V2 consolidation. The
+# `data/` tree was never moved under `apps/edge-daemon/`, so test paths
+# pointing at tracks / gold-standard JSONs resolve against the repo root.
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 
@@ -150,7 +156,7 @@ def synth_lap_frames():
 @pytest.fixture
 def real_track_path():
     """Path to the real, on-disk Sonoma track JSON."""
-    return ROOT / "data" / "tracks" / "sonoma.json"
+    return REPO_ROOT / "data" / "tracks" / "sonoma.json"
 
 
 @pytest.fixture
@@ -161,7 +167,7 @@ def real_track(real_track_path):
 
 @pytest.fixture
 def real_gold_path():
-    return ROOT / "data" / "reference" / "sonoma_gold.json"
+    return REPO_ROOT / "data" / "reference" / "sonoma_gold.json"
 
 
 @pytest.fixture
@@ -244,7 +250,6 @@ def isolated_bridge(monkeypatch, tmp_path):
     monkeypatch.setattr(br.state, "db_path", str(tmp_path / "test.duckdb"))
     monkeypatch.setattr(br.state, "has_duckdb", True)
     monkeypatch.setattr(br.state, "has_analyzer", True)
-    monkeypatch.setattr(br.state, "has_adk", False)
     monkeypatch.setattr(br.state, "has_coach", False)
     monkeypatch.setattr(br.state, "has_sonic", False)
     monkeypatch.setattr(br.state, "sonoma", sonoma)
@@ -252,7 +257,7 @@ def isolated_bridge(monkeypatch, tmp_path):
     monkeypatch.setattr(br.state, "session_bursts", [])
     monkeypatch.setattr(
         br.state, "track",
-        load_track(str(ROOT / "data" / "tracks" / "sonoma.json")),
+        load_track(str(REPO_ROOT / "data" / "tracks" / "sonoma.json")),
     )
     monkeypatch.setattr(br.state, "coach", None)
     monkeypatch.setattr(br.state, "arbiter", None)

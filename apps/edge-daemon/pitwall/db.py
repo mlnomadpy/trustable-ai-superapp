@@ -88,8 +88,10 @@ def iso(v):
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
+# pitwall → edge-daemon → apps → repo root. data/ lives at the repo root
+# post-V2-consolidation (was one level short, seeding 0 signals).
 REGISTRY_SEED_PATH = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), "..", "..", "data", "registry", "obd2_pids.json",
+    os.path.dirname(__file__), "..", "..", "..", "data", "registry", "obd2_pids.json",
 ))
 
 # Wide-table columns that double as registry signals — used by capability

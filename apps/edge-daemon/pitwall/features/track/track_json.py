@@ -12,7 +12,7 @@ from pitwall.state import SIM_DIR
 def load_track_json(track_id: str) -> dict | None:
     """Load data/tracks/<id>.json or return None."""
     path = os.path.abspath(os.path.join(
-        SIM_DIR, "..", "..", "data", "tracks", f"{track_id}.json",
+        SIM_DIR, "..", "..", "..", "data", "tracks", f"{track_id}.json",
     ))
     if not os.path.exists(path):
         return None

@@ -116,7 +116,7 @@ class CoachEngine:
 VALID_EMOTIONS = frozenset({
     "neutral", "thinking", "analyzing", "encouraging", "proud",
     "excited", "serious", "concerned", "disappointed", "intense",
-    "relaxed", "tired",
+    "relaxed", "tired", "focused",  # `focused` is in the ADK system prompt
 })
 
 

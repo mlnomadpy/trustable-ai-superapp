@@ -39,7 +39,7 @@ def _qa_cleanup_stale():
         _qa_histories.pop(k, None); _qa_timestamps.pop(k, None)
 
 def _drain_adk_traces(adk_session_id=None, pitwall_sid=""):
-    if not state.has_adk or not state.has_duckdb: return
+    if not state.has_duckdb: return
     try:
         traces = get_pending_traces(adk_session_id)
         if not traces: return
@@ -142,28 +142,33 @@ def coach_debrief():
         if not frames: return jsonify({"error":"no telemetry — push frames or pass vbo_path","session_id":sid}), 400
     bundle = analyze_session(session_id=sid, frames=frames, coach=state.coach if state.has_coach else None, driver_level=getattr(state.coach,"driver_level","intermediate") if state.coach else "intermediate")
     bundle = _normalize_debrief_bundle(bundle)
-    if state.has_adk:
-        try:
-            adk_prompt = f"Generate a post-session debrief for session '{sid}', driver '{driver_id}'. Query DuckDB for lap times, corner grades, coaching notes. Structure: 1 highlight sentence, then FOCUS list of 3 items."
-            
-            # State overrides to speed up reasoning with pre-computed bundle context
-            overrides = {
-                "temp:session_id": sid,
-                "temp:best_lap": bundle.get("scorecard", {}).get("best_lap_s"),
-                "temp:n_laps": bundle.get("scorecard", {}).get("n_laps"),
-                "temp:highlights_count": len(bundle.get("highlights", [])),
-            }
-            
-            adk_narrative, _adk_sid = run_adk(adk_prompt, user_id=driver_id or "driver", state_overrides=overrides)
-            _drain_adk_traces(adk_session_id=_adk_sid, pitwall_sid=sid)
+    try:
+        adk_prompt = f"Generate a post-session debrief for session '{sid}', driver '{driver_id}'. Query DuckDB for lap times, corner grades, coaching notes. Structure: 1 highlight sentence, then FOCUS list of 3 items."
 
-            adk_narrative, _em_val = extract_emotion(adk_narrative)
-            if _em_val != "neutral": bundle["emotion"] = _em_val
-            if adk_narrative.strip():
-                bundle["narrative"] = adk_narrative
-                bundle["narrative_source"] = "adk"
-        except (ConnectionError, TimeoutError, OSError, RuntimeError, json.JSONDecodeError) as _e:
-            log.warning("ADK debrief failed (%s: %s)", type(_e).__name__, _e)
+        # State overrides to speed up reasoning with pre-computed bundle context
+        overrides = {
+            "temp:session_id": sid,
+            "temp:best_lap": bundle.get("scorecard", {}).get("best_lap_s"),
+            "temp:n_laps": bundle.get("scorecard", {}).get("n_laps"),
+            "temp:highlights_count": len(bundle.get("highlights", [])),
+        }
+
+        adk_narrative, _adk_sid = run_adk(adk_prompt, user_id=driver_id or "driver", state_overrides=overrides)
+        _drain_adk_traces(adk_session_id=_adk_sid, pitwall_sid=sid)
+
+        adk_narrative, _em_val = extract_emotion(adk_narrative)
+        if _em_val != "neutral": bundle["emotion"] = _em_val
+        if adk_narrative.strip():
+            bundle["narrative"] = adk_narrative
+            bundle["narrative_source"] = "adk"
+    except Exception as _e:
+        # The LLM is best-effort here: the analyzer bundle is already a valid
+        # debrief. ADK now always attempts LocalLLM (ADR-024), so when the
+        # server is unreachable litellm raises APIConnectionError /
+        # InternalServerError (not an OSError subclass). Any failure → keep
+        # the analyzer bundle and log; never 500 because the LLM is down.
+        log.warning("ADK debrief failed (%s: %s) — using analyzer bundle",
+                    type(_e).__name__, _e)
     with state.bundles_lock: state.session_bundles[sid] = bundle
     if persist and driver_id and state.has_duckdb:
         try:
@@ -272,38 +277,40 @@ def coach_brief():
             log.warning("compute_profile for %s failed: %s", driver_id, e)
     danger_today = [f"{d.id}: {d.description}" for d in sonoma.DANGER_ZONES if (weather_phase.id=="morning_fog" and d.severity in ("high","medium")) or d.severity=="high"]
     emotion = "neutral"; sid_param = (request.args.get("session_id") or "").strip() or None
-    HAS_ADK_THIS_REQUEST = False
-    if state.has_adk:
-        try:
-            adk_prompt = f"Generate a pre-session brief for driver '{driver_id}'. Date: {today}, weather: {weather_phase.id}, focus: {markers_selected or 'any'}, goal: {goal}. Weakest corner: {profile.get('weakest_recent_corner')}. Danger: {danger_today or 'none'}. Format as 2-4 sentences of narrative, followed by exactly 'FOCUS:' and 3 bullet points."
-            
-            # State overrides to persist driver context across the paddock agents
-            overrides = {
-                "app:track_phase": weather_phase.id,
-                "user:driver_level": "intermediate", # fallback
-                "user:weakest_corner": profile.get("weakest_recent_corner"),
-                "temp:markers_selected": markers_selected,
-            }
-            
-            narrative, _adk_sid = run_adk(adk_prompt, user_id=driver_id or "driver", state_overrides=overrides)
-            _drain_adk_traces(adk_session_id=_adk_sid, pitwall_sid=sid_param or "")
+    narrative: str = ""
+    focus: list = markers_selected[:3] or []
+    adk_succeeded = False
+    try:
+        adk_prompt = f"Generate a pre-session brief for driver '{driver_id}'. Date: {today}, weather: {weather_phase.id}, focus: {markers_selected or 'any'}, goal: {goal}. Weakest corner: {profile.get('weakest_recent_corner')}. Danger: {danger_today or 'none'}. Format as 2-4 sentences of narrative, followed by exactly 'FOCUS:' and 3 bullet points."
 
-            
-            focus = markers_selected[:3] or []
-            if "FOCUS:" in narrative:
-                parts = narrative.split("FOCUS:")
-                narrative = parts[0].strip()
-                focus_text = parts[1].strip()
-                bullets = [re.sub(r"^[-*0-9.]+\s*", "", line).strip() for line in focus_text.split("\n") if line.strip() and re.match(r"^[-*0-9.]+\s*", line.strip())]
-                if bullets:
-                    focus = bullets[:3]
-                    
-            narrative, _em_val = extract_emotion(narrative)
-            if _em_val != "neutral": emotion = _em_val
-            HAS_ADK_THIS_REQUEST = True
-        except (ConnectionError, TimeoutError, OSError, RuntimeError, json.JSONDecodeError) as _e:
-            log.warning("ADK brief failed (%s: %s)", type(_e).__name__, _e)
-    if not HAS_ADK_THIS_REQUEST:
+        # State overrides to persist driver context across the paddock agents
+        overrides = {
+            "app:track_phase": weather_phase.id,
+            "user:driver_level": "intermediate",  # fallback
+            "user:weakest_corner": profile.get("weakest_recent_corner"),
+            "temp:markers_selected": markers_selected,
+        }
+
+        narrative, _adk_sid = run_adk(adk_prompt, user_id=driver_id or "driver", state_overrides=overrides)
+        _drain_adk_traces(adk_session_id=_adk_sid, pitwall_sid=sid_param or "")
+
+        if "FOCUS:" in narrative:
+            parts = narrative.split("FOCUS:")
+            narrative = parts[0].strip()
+            focus_text = parts[1].strip()
+            bullets = [re.sub(r"^[-*0-9.]+\s*", "", line).strip() for line in focus_text.split("\n") if line.strip() and re.match(r"^[-*0-9.]+\s*", line.strip())]
+            if bullets:
+                focus = bullets[:3]
+
+        narrative, _em_val = extract_emotion(narrative)
+        if _em_val != "neutral": emotion = _em_val
+        adk_succeeded = True
+    except Exception as _e:
+        # ADK always attempts LocalLLM (ADR-024); an unreachable server
+        # raises litellm APIConnectionError (not OSError). Any failure →
+        # fall through to the RuleCoach/templated brief below, never 500.
+        log.warning("ADK brief failed (%s: %s) — falling back", type(_e).__name__, _e)
+    if not adk_succeeded:
         if hasattr(state.coach, "brief"):
             try:
                 result = state.coach.brief(driver_id=driver_id, today_iso=today, weather_phase=weather_phase.id, surface_state=weather_phase.surface_state, markers_selected=markers_selected, weakest_recent_corner=profile.get("weakest_recent_corner"), biggest_recent_improvement=profile.get("biggest_improvement"), danger_zones_today=danger_today, goal=goal, session_id=sid_param)
@@ -311,7 +318,6 @@ def coach_brief():
                 result = state.coach.brief(driver_id=driver_id, today_iso=today, weather_phase=weather_phase.id, surface_state=weather_phase.surface_state, markers_selected=markers_selected, weakest_recent_corner=profile.get("weakest_recent_corner"), biggest_recent_improvement=profile.get("biggest_improvement"), danger_zones_today=danger_today, goal=goal)
             if len(result)==3: narrative, focus, emotion = result
             else: narrative, focus = result
-        else: narrative, focus = "", markers_selected[:3]
     if state.has_duckdb and driver_id and narrative:
         try:
             with db_conn() as conn:
@@ -343,7 +349,6 @@ def coach_brief():
 @bp.route("/coach/ask", methods=["POST"])
 def coach_ask():
     """Multi-turn driver Q&A via ADK."""
-    if not state.has_adk: return jsonify({"error":"ADK not available"}), 503
     data = request.get_json(force=True, silent=True) or {}
     driver_id = data.get("driver_id",""); session_id = data.get("session_id",""); question = data.get("question","").strip()
     intent_override = (data.get("intent") or "").strip().lower()
@@ -394,7 +399,6 @@ def coach_ask_end():
 @bp.route("/coach/ask/stream", methods=["POST"])
 def coach_ask_stream():
     """SSE streaming variant of /coach/ask."""
-    if not state.has_adk: return jsonify({"error":"ADK streaming unavailable"}), 503
     data = request.get_json(force=True, silent=True) or {}
     driver_id = data.get("driver_id",""); session_id = data.get("session_id","")
     question = data.get("question","").strip(); intent_override = (data.get("intent") or "").strip().lower()
@@ -430,8 +434,7 @@ def coach_ask_stream():
 @bp.route("/coach/agents", methods=["GET"])
 def coach_agents():
     """Discover available ADK coaching agents."""
-    if not state.has_adk: return jsonify({"available":False,"reason":"google-adk not installed","agents":[]})
-    return jsonify({"available":True,"agents":state.adk_agent_registry})
+    return jsonify({"available": True, "agents": state.adk_agent_registry})
 
 
 @bp.route("/coach/traces", methods=["GET"])
@@ -444,13 +447,10 @@ def coach_traces():
       - since_ts   : optional ISO datetime — only rows newer than this
                      (enables incremental polling from the HUD)
 
-    Always returns HTTP 200. If ADK or DuckDB isn't available we still
-    return `{available: false, reason, traces: []}` so the HUD can render
-    an honest empty state instead of an error banner.
+    Always returns HTTP 200. If DuckDB isn't available we still return
+    `{available: false, reason, traces: []}` so the HUD can render an
+    honest empty state instead of an error banner.
     """
-    if not state.has_adk:
-        return jsonify({"available": False, "reason": "google-adk not installed",
-                        "traces": [], "count": 0})
     if not state.has_duckdb:
         return jsonify({"available": False, "reason": "duckdb not available",
                         "traces": [], "count": 0})

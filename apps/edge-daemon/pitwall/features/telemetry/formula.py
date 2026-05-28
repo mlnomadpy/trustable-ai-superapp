@@ -257,7 +257,9 @@ class FormulaRegistry:
 
 def load_standard_library(extra_paths: Iterable[str | Path] = ()) -> FormulaRegistry:
     """Convenience: load data/formulas/standard.yaml and optional extras."""
-    root = Path(__file__).resolve().parents[4]
+    # telemetry → features → pitwall → edge-daemon → apps → repo root.
+    # data/ lives at the repo root post-V2-consolidation.
+    root = Path(__file__).resolve().parents[5]
     reg = FormulaRegistry()
     reg.load_yaml(root / "data" / "formulas" / "standard.yaml")
     for p in extra_paths:

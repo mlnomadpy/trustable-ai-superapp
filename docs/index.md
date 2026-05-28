@@ -15,7 +15,7 @@ This is the engineering documentation for the Trustable AI racing coach sprint (
 | Sonic model v2 (LSTM-driven) | ✅ Done | Delta-based coaching cues tested on Sonoma replay |
 | **Python HTTP bridge** | ✅ Done | `src/pitwall/__main__.py` :8765 — 56 endpoints, DuckDB-backed, CAN ingest |
 | **Rally-style coach engine** | ✅ Done | `RuleCoach` + `LitertCoach` (Gemma 4 E2B via LiteRT-LM), Bentley pedagogy, T-Rod voice |
-| **ADK multi-agent paddock backend** | ✅ Done | 18 agents, 15 tools, `PitwallOrchestrator`, DuckDB tracing (ADR-019–021) |
+| **ADK multi-agent paddock backend** | ✅ Done | 23 agents, 21 tools, `PitwallOrchestrator`, DuckDB tracing (ADR-019–021, phase-2 expansion 2026-05-28) |
 | **CAN pipeline** | ✅ Done | `python-can` + `cantools` DBC decoding, USB-CAN adapters (CANable Pro / Macchina M2) |
 | **Gold Standard (AJ) reference lap** | ✅ Done | Per-corner grading, time-loss decomposition, A-F scorecard |
 | **Test suite** | ✅ Done | 358 tests passing, 51-assertion smoke test on 8273-frame VBO |
@@ -40,11 +40,11 @@ graph TB
         subgraph "Hot Path (<50 ms)"
             SONIC[sonic_model + RuleCoach<br/>canonical phrase library<br/>no LLM, reflexive cues]
         end
-        subgraph "Warm Path (<100 ms)"
-            LITERT[LitertCoach<br/>Gemma 4 E2B in-process<br/>via LiteRT-LM]
+        subgraph "Warm Path (2–4 s)"
+            LITERT[LitertCoach<br/>brief / debrief<br/>POST → LocalLLM]
         end
         subgraph "Paddock Path (2–15 s)"
-            ADK[18 ADK Agents<br/>Gemma 4 E4B via lit serve<br/>briefings, debriefs, Q&A]
+            ADK[18 ADK Agents<br/>Gemma 4 E4B via LocalLLM<br/>briefings, debriefs, Q&A]
         end
         BRIDGE[Flask Bridge :8765<br/>56 endpoints]
         DUCK[(DuckDB<br/>telemetry · laps · coaching_notes<br/>agent_traces · conversations)]
@@ -78,21 +78,22 @@ graph TB
 | Tier | Engine | Latency | When | What |
 |------|--------|---------|------|------|
 | 🔴 Hot | `sonic_model` + `RuleCoach` | <50 ms | Every frame (10 Hz) | Reflexive tone cues, threshold alerts, canonical pace notes |
-| 🟡 Warm | `LitertCoach` (Gemma 4 E2B, in-process) | <100 ms | On straights, debounced | Rally-style pace notes, Bentley pedagogy, T-Rod voice |
-| 🟢 Paddock | 18 ADK agents (Gemma 4 E4B, **pluggable local-LLM backend**) | 2–15 s | Off-track only | Pre-briefs, post-session debriefs, multi-turn Q&A |
+| 🟡 Warm | `LitertCoach` brief / debrief over LocalLLM | 2–4 s brief / 8–15 s debrief | Off-track only | Pre-session brief, post-session debrief, Bentley pedagogy, T-Rod voice |
+| 🟢 Paddock | 18 ADK agents (Gemma 4 E4B via LocalLLM) | 2–15 s | Off-track only | Pre-briefs, post-session debriefs, multi-turn Q&A |
 
-**Every LLM call goes to [LocalLLM](https://www.tahabouhsine.com/localllm/) over local HTTP** ([ADR-022](adr/022-openai-compatible-backend-selector.md)).
+**Every LLM call — warm and paddock — goes to [LocalLLM](https://www.tahabouhsine.com/localllm/) over local HTTP** ([ADR-024](adr/024-localllm-sole-llm-transport.md) for paddock, [ADR-025](adr/025-warm-path-localllm-only.md) for warm; both superseding [ADR-022](adr/022-openai-compatible-backend-selector.md)).
 LocalLLM is a sibling Apache-2.0 Android APK
 ([github.com/mlnomadpy/localllm](https://github.com/mlnomadpy/localllm)) that
 hosts LiteRT-LM and exposes an OpenAI-compatible HTTP server on
-`127.0.0.1:8099/v1`. As of 2026-05-12 it's the **default transport for both
-the warm path** (`LitertCoach.brief()` / `debrief()`) **and the paddock ADK
-tier** — fresh installs need zero env vars. Two opt-out paths remain
-(`PITWALL_ADK_OPENAI_URL=""` + `PITWALL_ADK_BACKEND=engine` for in-process,
-`PITWALL_ADK_BACKEND=litertlm` for legacy `lit serve`), and the same `openai`
-selector also covers dev workstations running Ollama / LM Studio / llama.cpp
-/ vLLM. Every backend dials only `localhost` — no hosted API. See
-[ADK Agent Architecture → Model backend selector](adk-agent-architecture.md#model-backend-selector).
+`127.0.0.1:8099/v1`. As of 2026-05-28 it's the **sole** transport on both
+tiers — `google-adk` and `litellm` are base dependencies of
+`apps/edge-daemon`, the in-process `litert_lm.Engine` warm path was
+retired, and the `PITWALL_ADK_BACKEND` / dual-transport selectors are
+gone. The same endpoint also covers dev workstations running Ollama / LM
+Studio / llama.cpp / vLLM — just point `PITWALL_ADK_OPENAI_URL` at them.
+The paddock tier uses `LiteLlm` (litellm); the warm path uses stdlib
+`urllib.request`. Both speak OpenAI `chat.completions` against the same
+URL. No hosted API is ever dialled.
 
 ## What's Different from Pitwall Open Source
 
@@ -100,7 +101,7 @@ selector also covers dev workstations running Ollama / LM Studio / llama.cpp
 |----------------------|------------------------|
 | Commodity hardware ($40–230) | Pro hardware: Racelogic Mini + USB-CAN + Pixel 10 |
 | Hot path: hardcoded rules engine | Hot path: **canonical phrase library + sonic model** (<50 ms) |
-| Cold path: Gemini API via SSE | Warm path: **Gemma 4 E2B on-device** via LiteRT-LM (<100 ms) |
+| Cold path: Gemini API via SSE | Warm path: **Gemma 4 E2B via LocalLLM** (HTTP → `127.0.0.1:8099`, 2–4 s brief) |
 | No paddock intelligence | Paddock: **18 ADK agents** (Gemma 4 E4B, briefings, debriefs, Q&A) |
 | Generic coaching rules | **Ross Bentley Pedagogical Vector Retrieval** (structured curriculum) |
 | Driver's personal best as baseline | **Gold Standard: AJ's pro lap + T-Rod's human coaching audio** |
@@ -122,7 +123,7 @@ What we **built and validated** (new):
 - **Auto track builder** — GPS curvature → corner definitions. 3 tracks generated, 31 total corners with brake zones
 - **Sonic model v2** — LSTM delta drives continuous audio cues. 78% of frames have active cues, 22% silence
 - **Corner grader + time-loss decomposition** — A-F grades per corner, weighted by Sonoma lap-time leverage
-- **18-agent ADK paddock backend** — briefings, debriefs, Q&A with DuckDB-backed tools and agent tracing
+- **23-agent ADK paddock backend** — briefings, debriefs, Q&A with DuckDB-backed tools and agent tracing (TPMS / handling balance / engine health / traction / input quality / safety domains added 2026-05-28)
 - **CAN pipeline** — USB-CAN → `python-can` → DBC decoding → DuckDB, with 6 adapter types supported
 - **358-test suite** — including 51-assertion end-to-end smoke test on real Sonoma VBO data
 
@@ -130,7 +131,7 @@ What we **built and validated** (new):
 
 - [Internal Architecture](internal_architecture.md) — As-built backend topology with Mermaid diagrams
 - [API Reference](api.md) — 56 endpoint reference for the Flask bridge
-- [ADK Agent Architecture](adk-agent-architecture.md) — 18-agent paddock backend topology
+- [ADK Agent Architecture](adk-agent-architecture.md) — 23-agent paddock backend topology
 - [ADK Implementation Plan](adk-implementation-plan.md) — As-built status, all phases complete
 - [Coaching Engine](coaching-engine.md) — Hot/warm path coaching, Bentley pedagogy
 - [Feedback System](feedback-system.md) — 3-layer coaching: sonic cues + corner grading + session review

@@ -31,13 +31,13 @@ htmlcov/
 *.profraw
 default.profraw
 
-# Node / Vite / PWA
+# Node / Vite / PWA  (app is apps/paddock-dashboard/ since the V2 consolidation)
 node_modules/
-apps/pwa/dist/
-apps/pwa/.vite/
-apps/pwa/test-results/
-apps/pwa/playwright-report/
-apps/pwa/coverage/
+apps/paddock-dashboard/dist/
+apps/paddock-dashboard/.vite/
+apps/paddock-dashboard/test-results/
+apps/paddock-dashboard/playwright-report/
+apps/paddock-dashboard/coverage/
 *.log
 .npm/
 
@@ -49,10 +49,13 @@ site/
 firebase-debug.log
 firestore-debug.log
 
-# DuckDB / SQLite working files
+# DuckDB / SQLite working files (the embedded DB resolves to SQLite on Termux)
 *.duckdb
 *.duckdb.wal
 *.duckdb.shm
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 *.sqlite-journal
 
 # Local env

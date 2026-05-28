@@ -1,8 +1,16 @@
 # ADR-022 — On-Phone LocalLLM Server (OpenAI-Compatible)
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-024](024-localllm-sole-llm-transport.md) (2026-05-28)
 **Date:** 2026-05-12
-**Relates to:** [ADR-017](017-three-tier-coach-architecture.md), [ADR-019](019-adk-multi-agent-backend.md), [ADR-021](021-adk-second-audit.md)
+**Relates to:** [ADR-017](017-three-tier-coach-architecture.md), [ADR-019](019-adk-multi-agent-backend.md), [ADR-021](021-adk-second-audit.md), [ADR-024](024-localllm-sole-llm-transport.md)
+
+> **2026-05-28 — Superseded.** The three-way `PITWALL_ADK_BACKEND` selector
+> introduced here was removed post-Sonoma. LocalLLM (the `openai` branch
+> below) is now the **sole** ADK transport, and `google-adk` + `litellm` are
+> base dependencies of `apps/edge-daemon` rather than optional extras. See
+> [ADR-024](024-localllm-sole-llm-transport.md) for the consolidation rationale.
+> The history below documents the multi-backend design as it shipped between
+> 2026-05-12 and 2026-05-28.
 
 ---
 

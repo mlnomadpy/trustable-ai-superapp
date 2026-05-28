@@ -456,7 +456,7 @@ def session_start():
         car=data.get("car"),
         note=data.get("note"),
     )
-    if state.has_adk and driver_id:
+    if driver_id:
         from pitwall.features.coaching.adk_agents import reset_driver_session
         reset_driver_session(driver_id)
     return jsonify({"started": True, "session_id": sid})

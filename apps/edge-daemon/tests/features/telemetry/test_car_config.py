@@ -37,7 +37,7 @@ from pitwall.features.telemetry.formula import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[5]          # repo root (data/ lives here)
 BMW_YAML = ROOT / "data" / "cars" / "bmw_e46_m3.yaml"
 
 
@@ -55,17 +55,22 @@ def test_bmw_yaml_loads(bmw: CarConfig):
 def test_bmw_yaml_has_expected_shape(bmw: CarConfig):
     # These counts are load-bearing; if a YAML change moves them, the
     # capability matrix doc + the README ingest section need updates too.
-    assert len(bmw.processors) == 22
-    assert len(bmw.cross_derived) == 2
+    # AiM MXP config (ADR-016): 34 per-signal processors, 7 cross-derived
+    # (combo_g, total_g, the 3 wheel-speed averages, 2 TPMS averages),
+    # 1 method (gear_position).
+    assert len(bmw.processors) == 34
+    assert len(bmw.cross_derived) == 7
     assert len(bmw.methods) == 1
 
 
 def test_bmw_yaml_specific_pipelines_present(bmw: CarConfig):
-    # Spot-check the signal names that drive the pipeline behaviour
+    # Spot-check the signal names that drive the pipeline behaviour.
+    # AiM DBC names (data/dbc/pitwall.dbc) — oil_filter_temp_f is the raw
+    # bus signal now (no rename), vertical_accel_g keeps its bus sign.
     for raw_name in (
-        "vertical_accel_g",   # has sign-flip
+        "vertical_accel_g",    # canonical g_vert (no sign-flip — keeps bus value)
         "speed_mph",           # derives speed_ms + speed_kmh
-        "oil_temp_f",          # renames to oil_filter_temp_f + derives _c
+        "oil_filter_temp_f",   # derives oil_filter_temp_c
         "brake_press_psi",     # derives brake_bar
         "lateral_accel_g",     # canonical g_lat
         "inline_accel_g",      # canonical g_long
@@ -79,7 +84,11 @@ def test_bmw_yaml_specific_pipelines_present(bmw: CarConfig):
 
 def test_bmw_yaml_cross_derived_names(bmw: CarConfig):
     names = {cd.output_name for cd in bmw.cross_derived}
-    assert names == {"combo_g", "wheel_speed_avg_mph"}
+    assert names == {
+        "combo_g", "total_g",
+        "wheel_speed_avg_mph", "wheel_speed_front_avg_mph", "wheel_speed_rear_avg_mph",
+        "tpms_press_avg_psi", "tpms_temp_avg_f",
+    }
 
 
 def test_bmw_yaml_method_registered(bmw: CarConfig):
@@ -106,13 +115,14 @@ def _process_one(bmw, latest, raw_name, raw_value, extra=None):
     return bmw.process_decoded_frame(decoded, latest)
 
 
-def test_vertical_accel_sign_flip(bmw: CarConfig, latest):
-    """PDF §6.2: vertical_accel_g raw -0.99 g must emit as +0.99 g (the
-    YAML's `apply: [{sign_flip: true}]` step). Also emits as canonical
-    `g_vert`."""
+def test_vertical_accel_canonical_keeps_bus_sign(bmw: CarConfig, latest):
+    """vertical_accel_g is emitted under the canonical `g_vert` with the
+    bus sign preserved. Per the YAML (data/cars/bmw_e46_m3.yaml §8), the
+    PDF's "+ = bump" convention is NOT applied — we keep the IMU's own
+    convention (gravity negative at rest), so raw -0.99 g stays -0.99 g."""
     em = dict(_process_one(bmw, latest, "vertical_accel_g", -0.99))
-    assert em["vertical_accel_g"] == pytest.approx(0.99, abs=1e-9)
-    assert em["g_vert"] == pytest.approx(0.99, abs=1e-9)
+    assert em["vertical_accel_g"] == pytest.approx(-0.99, abs=1e-9)
+    assert em["g_vert"] == pytest.approx(-0.99, abs=1e-9)
 
 
 def test_speed_mph_to_ms_derive(bmw: CarConfig, latest):
@@ -131,18 +141,13 @@ def test_brake_press_psi_to_bar_derive(bmw: CarConfig, latest):
     assert em["brake_bar"] == pytest.approx(145.0377 * 0.0689476, abs=1e-6)
 
 
-def test_oil_temp_f_rename_and_unit_derive(bmw: CarConfig, latest):
-    """PDF's 'Oil Filter Temp' is bound to DBC `oil_temp_f`. The YAML
-    renames it to `oil_filter_temp_f` AND emits the °C unit twin.
-    The raw DBC name must no longer appear in the emissions — that
-    was the whole point of the rename."""
-    em = dict(_process_one(bmw, latest, "oil_temp_f", 212.0))
-    assert "oil_filter_temp_f" in em
+def test_oil_filter_temp_unit_derive(bmw: CarConfig, latest):
+    """The AiM DBC exposes oil filter temperature directly as
+    `oil_filter_temp_f` (frame 0x458, AimExtended09_Analog1). The YAML
+    emits the °C unit twin alongside it."""
+    em = dict(_process_one(bmw, latest, "oil_filter_temp_f", 212.0))
     assert em["oil_filter_temp_f"] == pytest.approx(212.0, abs=1e-9)
     assert em["oil_filter_temp_c"] == pytest.approx(100.0, abs=1e-9)  # 212 °F = 100 °C
-    assert "oil_temp_f" not in em, (
-        "DBC name oil_temp_f leaked through despite rename_to"
-    )
 
 
 def test_lateral_accel_canonical_alias(bmw: CarConfig, latest):
