@@ -8,13 +8,12 @@ every few seconds on straights only.
 
 Two implementations behind one interface:
 
-  - RuleCoach       : zero-dependency templated phrases keyed by a small
-                      pedagogical-vector matcher (Ross Bentley curriculum
-                      distilled in project_pitwall_bentley_pedagogy.md).
-  - LitertCoach     : on-device Gemma 4 E2B inference via LiteRT-LM
-                      (MediaPipe Genai). Runs in-process on the Pixel 10
-                      Tensor G5 NPU. Falls back to RuleCoach when the
-                      model is unreachable or inference times out.
+  - RuleCoach    : zero-dependency templated phrases keyed by a small
+                   pedagogical-vector matcher (Ross Bentley curriculum
+                   distilled in project_pitwall_bentley_pedagogy.md).
+  - LitertCoach  : LocalLLM HTTP coach (ADR-024 / ADR-025). brief() and
+                   debrief() POST to LocalLLM's OpenAI-compatible
+                   /v1/chat/completions. propose() defers to RuleCoach.
 
 The arbiter (P3 safety / P2 technique / P1 strategy with cooldown + corner
 suppression) lives at the call site in pitwall_app.SessionManager so this
@@ -28,7 +27,7 @@ focused per-concern siblings:
   - prompts.py        — system / user prompt builders + templated fallbacks
   - pedagogy.py       — Bentley concept matcher + capability-aware rule registry
   - rule_coach.py     — RuleCoach (zero-dep templated coach)
-  - litert_coach.py   — LitertCoach (HTTP + in-process LiteRT-LM)
+  - litert_coach.py   — LitertCoach (LocalLLM HTTP)
   - arbiter.py        — CoachArbiter (P1/P2/P3 cooldown gate)
 """
 
@@ -49,11 +48,7 @@ from pitwall.features.coaching.engine_base import (
     extract_emotion,
     set_friction_logger,
 )
-from pitwall.features.coaching.litert_coach import (
-    LitertCoach,
-    TfliteCoach,
-    _extract_assistant_text,
-)
+from pitwall.features.coaching.litert_coach import LitertCoach
 from pitwall.features.coaching.pedagogy import (
     COACH_RULES,
     CoachRule,
@@ -143,39 +138,22 @@ def make_coach(
     kind: str = "auto",
     *,
     driver_level: str = "intermediate",
-    litert_model_path: str = "",
-    # Back-compat alias; older callers may pass `tflite_model_path=`
-    tflite_model_path: str = "",
 ) -> CoachEngine:
     """Factory.
 
-    kind="auto"     : prefer LitertCoach. Per ADR-022 LitertCoach now
-                      defaults to HTTP transport against LocalLLM
-                      (`http://localhost:8099/v1`) — overridable via
-                      PITWALL_ADK_OPENAI_URL (legacy: PITWALL_LITERT_URL).
-                      Set the env var to an empty string to fall back to
-                      in-process litert-lm; if
-                      neither path produces a loaded LLM, falls through
-                      to RuleCoach.
-    kind="litert"   : force LitertCoach (same HTTP-default behaviour as
-                      "auto"). Internally falls back to templated output
-                      if LocalLLM is unreachable AND no .litertlm is found.
-    kind="rule"     : force the zero-dep templated coach.
+    kind="auto"   : LitertCoach (LocalLLM HTTP, ADR-024 / ADR-025).
+                    Construction never fails — LocalLLM may be unreachable
+                    at boot, and brief()/debrief() handle that at call
+                    time by returning empty narratives + writing friction
+                    records. There is no longer an "engine load" probe at
+                    construction time.
+    kind="litert" : same as "auto".
+    kind="rule"   : the zero-dep templated coach.
     """
-    model_path = litert_model_path or tflite_model_path
     if kind == "rule":
         return RuleCoach(driver_level=driver_level)
-    # "tflite" kept as a deprecated alias for one cycle
-    if kind in ("litert", "tflite"):
-        return LitertCoach(model_path=model_path, driver_level=driver_level)
-    if kind == "auto":
-        try:
-            engine = LitertCoach(model_path=model_path, driver_level=driver_level)
-            if engine._llm is not None:
-                return engine
-        except Exception:
-            pass
-        return RuleCoach(driver_level=driver_level)
+    if kind in ("litert", "auto"):
+        return LitertCoach(driver_level=driver_level)
     raise ValueError(f"unknown coach kind: {kind!r}")
 
 
@@ -190,7 +168,6 @@ __all__ = [
     # Coaches
     "RuleCoach",
     "LitertCoach",
-    "TfliteCoach",
     # Factory / wiring
     "make_coach",
     "build_context",
@@ -216,6 +193,5 @@ __all__ = [
     "_templated_pre_brief",
     "_split_brief_narrative_and_focus",
     "_split_debrief_narrative_and_focus",
-    "_extract_assistant_text",
     "_emit_friction",
 ]

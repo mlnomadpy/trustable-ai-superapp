@@ -25,19 +25,7 @@ def _seed_traces(rows: list[dict]) -> None:
         pytest.skip("duckdb not available in this environment")
 
 
-def test_coach_traces_returns_unavailable_when_adk_disabled(client, monkeypatch):
-    monkeypatch.setattr(br.state, "has_adk", False)
-    r = client.get("/coach/traces")
-    assert r.status_code == 200
-    body = r.get_json()
-    assert body["available"] is False
-    assert body["traces"] == []
-    assert body["count"] == 0
-    assert "reason" in body
-
-
-def test_coach_traces_empty_when_adk_present_and_no_rows(client, monkeypatch):
-    monkeypatch.setattr(br.state, "has_adk", True)
+def test_coach_traces_empty_when_no_rows(client):
     if not br.state.has_duckdb:
         pytest.skip("duckdb not available")
     r = client.get("/coach/traces")
@@ -48,8 +36,7 @@ def test_coach_traces_empty_when_adk_present_and_no_rows(client, monkeypatch):
     assert body["count"] == len(body["traces"])
 
 
-def test_coach_traces_returns_seeded_rows_newest_first(client, monkeypatch):
-    monkeypatch.setattr(br.state, "has_adk", True)
+def test_coach_traces_returns_seeded_rows_newest_first(client):
     if not br.state.has_duckdb:
         pytest.skip("duckdb not available")
     _seed_traces([
@@ -75,8 +62,7 @@ def test_coach_traces_returns_seeded_rows_newest_first(client, monkeypatch):
     assert first["event_type"] == "tool"
 
 
-def test_coach_traces_filters_by_session_id(client, monkeypatch):
-    monkeypatch.setattr(br.state, "has_adk", True)
+def test_coach_traces_filters_by_session_id(client):
     if not br.state.has_duckdb:
         pytest.skip("duckdb not available")
     _seed_traces([
@@ -94,8 +80,7 @@ def test_coach_traces_filters_by_session_id(client, monkeypatch):
         assert t["pitwall_sid"] == "filt-A"
 
 
-def test_coach_traces_respects_limit_cap(client, monkeypatch):
-    monkeypatch.setattr(br.state, "has_adk", True)
+def test_coach_traces_respects_limit_cap(client):
     if not br.state.has_duckdb:
         pytest.skip("duckdb not available")
     r = client.get("/coach/traces?limit=99999")
