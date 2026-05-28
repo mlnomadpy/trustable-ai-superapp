@@ -32,37 +32,31 @@ point of view.
 
 1. **ADK never touches the hot path.** In-drive coaching (< 100 ms) stays as `RuleCoach` + `CoachArbiter`. ADK is paddock-only.
 2. **DuckDB writes belong to the bridge.** All ADK tools query DuckDB `read_only=True`. The bridge is the sole writer — except `save_voice_scripts`, which writes to `tools/audio_cache/` (JSON files, not DuckDB).
-3. **Pluggable local-LLM backend — never a hosted API.** Per [ADR-022](adr/022-openai-compatible-backend-selector.md) the paddock tier is portable across three local backends, selected by `PITWALL_ADK_BACKEND`. All three speak to a model running on the same phone as the bridge. There is no hosted-LLM fallback.
+3. **LocalLLM is the sole paddock LLM transport — never a hosted API.** Per [ADR-024](adr/024-localllm-sole-llm-transport.md) (superseding [ADR-022](adr/022-openai-compatible-backend-selector.md)), every ADK call goes through `LiteLlm` to [LocalLLM](https://github.com/mlnomadpy/localllm) on `127.0.0.1:8099/v1`. `google-adk` and `litellm` are base dependencies of `apps/edge-daemon` — the bridge fails to start without them. The earlier `PITWALL_ADK_BACKEND` selector and its `engine` / `litertlm` branches are retired.
 
-    | `PITWALL_ADK_BACKEND` | Transport            | Server                                                     | Client class                          | Used for                                              |
-    | --------------------- | -------------------- | ---------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------- |
-    | `openai` *(default)*  | HTTP → `127.0.0.1`   | [**LocalLLM APK**](https://www.tahabouhsine.com/localllm/) (`:8099/v1`) | `LiteLlm(api_base=..., api_key=...)`  | **Pixel field deployment — primary path**             |
-    | `engine`              | In-process (no HTTP) | *(same process as bridge — no server)*                     | `LitertLmModel(BaseLlm)`              | Single-process Termux setups without LocalLLM         |
-    | `litertlm`            | HTTP → `lit serve`   | `lit serve` Python process                                 | `Gemini(base_url=..., model=...)`     | Legacy / desktop dev with `lit serve` already running |
+    LocalLLM is a separate Apache-2.0 Android APK that hosts LiteRT-LM in a
+    native Android process with GPU/NPU delegate access via LiteRT's AUTO
+    backend, owns model lifecycle through its in-app catalog, and speaks
+    OpenAI's `chat.completions` with SSE streaming and signed-bearer-token
+    auth. The same `LiteLlm` client also covers Ollama / LM Studio /
+    llama.cpp / vLLM on dev workstations — point `PITWALL_ADK_OPENAI_URL`
+    at them and nothing else changes.
 
-    **Default behaviour (ADR-022, 2026-05-12 onward):** new installs of the
-    bridge talk to [LocalLLM](https://github.com/mlnomadpy/localllm) — a
-    separate Apache-2.0 Android APK that hosts LiteRT-LM in a native Android
-    process with GPU/NPU delegate access via LiteRT's AUTO backend, owns
-    model lifecycle through its in-app catalog, and speaks OpenAI's
-    `chat.completions` with SSE streaming and signed-bearer-token auth. The
-    same `openai` selector also covers Ollama / LM Studio / llama.cpp / vLLM
-    on dev workstations.
+    **The warm path is on the same transport.**
+    `LitertCoach.brief()` and `LitertCoach.debrief()`
+    ([coach_engine.py](coaching-engine.md)) post directly to
+    LocalLLM's `/v1/chat/completions` via stdlib `urllib.request` per
+    [ADR-025](adr/025-warm-path-localllm-only.md). The in-process
+    `litert_lm.Engine` warm-path branch was retired; warm and paddock
+    share one transport contract.
 
-    **The warm path is on the same transport.** `LitertCoach.brief()` and
-    `LitertCoach.debrief()` ([coach_engine.py](coaching-engine.md)) also
-    default to HTTP-to-LocalLLM as of ADR-022 — every LLM call in pitwall
-    goes through `127.0.0.1`. Set `PITWALL_ADK_OPENAI_URL=""` (empty;
-    legacy alias `PITWALL_LITERT_URL` still works with a
-    `DeprecationWarning`) to opt
-    back into the in-process `litert_lm.Engine` for the warm path.
-
-4. **Two runtimes, one ecosystem:**
+4. **One transport, three tiers:**
 
     | Path | Runtime | Model | How invoked | Latency budget |
     |---|---|---|---|---|
-    | In-drive (hot) | `litert_lm.Engine` (in-process) | Gemma 4 E2B | Direct API | < 100 ms |
-    | Paddock (ADK) | One of the three backends above | Gemma 4 E4B / E2B | See backend table | 2–15 s |
+    | In-drive (hot) | `RuleCoach` + canonical phrases | — | Pure Python | < 100 ms |
+    | Warm (brief / debrief) | LocalLLM (HTTP → `127.0.0.1:8099/v1`) | Gemma 4 E2B | `urllib.request` POST | 2–4 s brief / 8–15 s debrief |
+    | Paddock (ADK) | LocalLLM via `LiteLlm` (HTTP → `127.0.0.1:8099/v1`) | Gemma 4 E4B / E2B | `LiteLlm(model="openai/<id>", api_base=...)` | 2–15 s |
 
 5. **Routing is deterministic Python.** `PitwallOrchestrator` uses `_classify_intent()` — a keyword classifier — not LLM routing. This eliminates mis-routing between similar agents.
 6. **SQL queries are bounded.** `query_pitwall_db` enforces `LIMIT 500` and rejects non-SELECT. No agent can blow the context window via a table scan.
@@ -202,65 +196,122 @@ A third instance `narrative_agent` is used for QA paths.
 
 ## Agent catalogue
 
-17 specialist agents exposed via `AGENT_REGISTRY` (`/coach/agents`):
+23 specialist agents exposed via `AGENT_REGISTRY` (`/coach/agents`).
 
-**QA agents (15)** — TelemetryAgent, LapComparisonAgent, CornerCoachAgent,
-ProgressTrackerAgent, SetupAdvisorAgent, MindsetCoachAgent, GoldLapAgent,
-WeatherAdaptationAgent, SessionPlannerAgent, IncidentReviewAgent,
-RacePaceAgent, GoalSettingAgent, MentalMapAgent, VoiceScriptAgent,
-AgentMetaAgent.
+**Foundation QA agents (15, ADR-019/020/021)** — TelemetryAgent,
+LapComparisonAgent, CornerCoachAgent, ProgressTrackerAgent, SetupAdvisorAgent,
+MindsetCoachAgent, GoldLapAgent, WeatherAdaptationAgent, SessionPlannerAgent,
+IncidentReviewAgent, RacePaceAgent, GoalSettingAgent, MentalMapAgent,
+VoiceScriptAgent, AgentMetaAgent.
+
+**Phase-2 AiM-aware specialists (6, 2026-05-28)** — each owns one AiM signal
+domain end-to-end and publishes its findings under a named `output_key` that
+the brief / debrief narrative templates cite:
+
+- **TireManagerAgent** (`tire_data`) — TPMS pressure / temperature window
+  + alarms. Cold→hot delta, per-corner balance, cold-pressure target advice.
+- **HandlingBalanceAgent** (`handling_data`) — measured understeer /
+  oversteer per corner via yaw rate × steering bicycle model (E46 M3
+  wheelbase 2.731 m, ratio 15.4:1). Surfaces YAML §7 sign-convention warning.
+- **EngineHealthAgent** (`engine_health_data`) — S54 vitals: oil-pressure
+  floor under load, coolant / oil temp drift, fuel pressure under brake.
+  Sentinel-aware (drops AiM `0xFFFF` no-reading marker).
+- **TractionAgent** (`traction_data`) — wheelspin / lockup events from
+  per-wheel speed deltas, attributed to corner segments.
+- **InputQualityAgent** (`input_quality_data`) — steering oscillation,
+  throttle modulation rate, brake-release shape; 0–100 smoothness score.
+- **SafetyMonitorAgent** (`safety_data`) — ABS / DSC / MIL / TPMS alarm
+  timeline. Explains pace drops via active safety events.
 
 **Pipeline-only data agents (2)** in the registry but never routed by
 `_classify_intent` — they run inside DebriefPipeline / BriefPipeline:
 HighlightFinderAgent, PedagogyAgent.
 
-Three additional `Agent` instances exist internally and are NOT in the
-registry: `NarrativeAgentBrief`, `NarrativeAgentDebrief`, and the three
-`*AgentDebrief` / `*AgentBrief` pipeline copies of TelemetryAgent /
-HighlightFinderAgent / PedagogyAgent. They share identical instruction
-templates with their siblings; separate instances prevent session-state
-bleed across overlapping requests.
+Additional internal `Agent` instances exist and are NOT in the registry:
+`NarrativeAgentBrief`, `NarrativeAgentDebrief`, the 9 pipeline copies of
+the data agents (`TelemetryAgentDebrief`, `HighlightFinderAgentDebrief`,
+`PedagogyAgentDebrief`, `TireManagerAgentDebrief`, etc.), and 3 brief-side
+copies (`PedagogyAgentBrief`, `TireManagerAgentBrief`,
+`EngineHealthAgentBrief`, `SafetyMonitorAgentBrief`). They share identical
+instruction templates with their siblings; separate instances prevent
+session-state bleed across overlapping requests and satisfy ADK's
+single-parent invariant inside the parallel data phases.
 
-All agents share the same `_model` symbol set at module-load by the
-backend selector — see [Model backend selector](#model-backend-selector) below.
-Agent definitions are backend-agnostic: the selector resolves to one of
-`LitertLmModel(...)`, `Gemini(base_url=..., model=...)`, or
-`LiteLlm(api_base=..., api_key=..., model=...)`, and every agent picks it up
-identically.
+All agents share the same `_model` symbol set at module-load — a
+`LiteLlm(model="openai/<id>", api_base=..., api_key=...)` instance dialling
+LocalLLM. See [Model transport](#model-transport) below.
 
 ### Pipeline data agents (with `output_key`)
 
 | Agent | `output_key` | Tools |
 |---|---|---|
-| `TelemetryAgent` | `telemetry_data` | `query_pitwall_db`, `get_session_highlights` |
-| `HighlightFinderAgent` | `highlights_data` | `get_session_highlights`, `query_pitwall_db` |
+| `TelemetryAgent` | `telemetry_data` | `query_pitwall_db`, `get_session_highlights`, `get_safety_events` |
+| `HighlightFinderAgent` | `highlights_data` | `get_session_highlights`, `get_input_smoothness`, `get_tire_thermal_window`, `query_pitwall_db` |
 | `PedagogyAgent` | `pedagogy_data` | `query_pitwall_db` |
-| `NarrativeAgent` / `NarrativeAgentDebrief` / `NarrativeAgentBrief` | *(none)* | *(none)* |
+| `TireManagerAgent` | `tire_data` | `get_tire_thermal_window`, `query_pitwall_db` |
+| `HandlingBalanceAgent` | `handling_data` | `get_handling_balance`, `query_pitwall_db` |
+| `EngineHealthAgent` | `engine_health_data` | `get_engine_health_timeline`, `query_pitwall_db` |
+| `TractionAgent` | `traction_data` | `get_traction_events`, `query_pitwall_db` |
+| `InputQualityAgent` | `input_quality_data` | `get_input_smoothness`, `query_pitwall_db` |
+| `SafetyMonitorAgent` | `safety_data` | `get_safety_events`, `query_pitwall_db` |
+| `NarrativeAgentDebrief` / `NarrativeAgentBrief` | *(none)* | *(none)* |
 
 ### QA specialist agents
 
 | Agent | Tools |
 |---|---|
-| `LapComparisonAgent` | `get_lap_delta`, `query_pitwall_db` |
-| `CornerCoachAgent` | `get_corner_history`, `query_pitwall_db` |
+| `LapComparisonAgent` | `get_lap_delta`, `get_engine_health_timeline`, `get_safety_events`, `query_pitwall_db` |
+| `CornerCoachAgent` | `get_corner_history`, `get_handling_balance`, `get_traction_events`, `query_pitwall_db` |
 | `ProgressTrackerAgent` | `get_progress_report`, `query_pitwall_db` |
-| `SetupAdvisorAgent` | `get_setup_indicators`, `query_pitwall_db` |
+| `SetupAdvisorAgent` | `get_setup_indicators`, `get_handling_balance`, `get_input_smoothness`, `get_tire_thermal_window`, `query_pitwall_db` |
 | `MindsetCoachAgent` | `get_progress_report`, `get_corner_history`, `query_pitwall_db` |
 | `GoldLapAgent` | `get_gold_lap_comparison`, `query_pitwall_db` |
-| `WeatherAdaptationAgent` | `get_weather_adaptation_context`, `query_pitwall_db` |
-| `SessionPlannerAgent` | `get_session_plan_context`, `query_pitwall_db` |
-| `IncidentReviewAgent` | `get_incident_moments`, `query_pitwall_db` |
-| `RacePaceAgent` | `get_race_pace_model`, `query_pitwall_db` |
+| `WeatherAdaptationAgent` | `get_weather_adaptation_context`, `get_tire_thermal_window`, `query_pitwall_db` |
+| `SessionPlannerAgent` | `get_session_plan_context`, `get_tire_thermal_window`, `query_pitwall_db` |
+| `IncidentReviewAgent` | `get_incident_moments`, `get_safety_events`, `get_traction_events`, `query_pitwall_db` |
+| `RacePaceAgent` | `get_race_pace_model`, `get_engine_health_timeline`, `get_tire_thermal_window`, `query_pitwall_db` |
 | `GoalSettingAgent` | `get_goal_targets`, `get_progress_report`, `query_pitwall_db` |
 | `MentalMapAgent` | `get_track_variance_map`, `query_pitwall_db` |
-| `VoiceScriptAgent` | `get_audio_script_context`, `save_voice_scripts` |
+| `VoiceScriptAgent` | `get_audio_script_context`, `save_voice_scripts`, `query_pitwall_db` |
 | `AgentMetaAgent` | `get_agent_telemetry` |
+
+### Brief / debrief narrative-slot map
+
+The narrative templates read these `output_key` slots when assembling the
+final brief / debrief text. Empty slots collapse to `""` via ADK's `{key?}`
+optional binding — pipelines stay valid when a data agent has nothing to say
+(e.g. no safety events on a clean session).
+
+```
+{highlights_data?}    ← HighlightFinderAgentDebrief
+{telemetry_data?}     ← TelemetryAgentDebrief
+{pedagogy_data?}      ← PedagogyAgent{Brief,Debrief}
+{tire_data?}          ← TireManagerAgent{Brief,Debrief}
+{handling_data?}      ← HandlingBalanceAgentDebrief    (debrief only)
+{engine_health_data?} ← EngineHealthAgent{Brief,Debrief}
+{traction_data?}      ← TractionAgentDebrief           (debrief only)
+{input_quality_data?} ← InputQualityAgentDebrief       (debrief only)
+{safety_data?}        ← SafetyMonitorAgent{Brief,Debrief}
+```
+
+DebriefDataPhase = `ParallelAgent` over 9 data agents. BriefDataPhase =
+`ParallelAgent` over 4 (pedagogy + tire + engine + safety — the domains
+that carry from the prior session into today's pre-brief).
 
 ---
 
 ## Tools specification
 
-All 15 tools live in `src/pitwall/adk_tools.py`. All decorated with `@_adk_tool` (falls back to identity decorator when `google-adk` is not installed).
+All 21 tools live in `apps/edge-daemon/pitwall/adk_tools.py`. All decorated with `@_adk_tool` (an identity passthrough — ADK 1.32 registers tools by being passed into `Agent(tools=[...])` directly).
+
+### Phase-2 AiM-aware tools (added 2026-05-28)
+
+- `get_tire_thermal_window(session_id)` — per-corner TPMS pressure / temperature window + alarm bitfield timeline (air leak / low temp / sensor fail). Source: `telemetry_signals` JOIN `signal_registry` on `tpms_press_*_bar`, `tpms_temp_*_c`, `tpms_alm_*`.
+- `get_handling_balance(session_id, corner_name?)` — measured vs. expected yaw rate per corner via bicycle model with E46 M3 constants. Folds cumulative distance via `% TRACK_LENGTH_M`. Flags YAML §7 sign-convention warning when counter-steer events > 50 % of samples.
+- `get_engine_health_timeline(session_id)` — oil / water / fuel pressure + oil temp aggregates and anomaly markers (oil-pressure starvation under RPM > 3000 + throttle > 10 %, coolant > 105 °C). Sentinel-aware: drops `0xFFFF` markers (psi → 4519 bar after scale per YAML §8).
+- `get_traction_events(session_id, slip_threshold_kmh=5.0)` — wheelspin (rear-axle > front-axle under throttle) and lockup (body > front-axle under brake) events, attributed to corner segments via lap-modulo distance.
+- `get_input_smoothness(session_id)` — steering oscillation (frame-to-frame stddev), throttle modulation rate (mean `|Δ throttle|`), median brake-release delta, brake-release event count, 0–100 smoothness score, verdict (`smooth` / `competent` / `choppy`).
+- `get_safety_events(session_id)` — ABS / DSC / MIL / brake-switch / TPMS alarm timeline. Returns ordered events with first-occurrence timestamp and total count.
 
 ### `query_pitwall_db(sql)`
 Read-only DuckDB query. Safety layer: rejects non-SELECT, auto-injects `LIMIT 500`.
@@ -313,81 +364,56 @@ Writes generated TTS phrases to `tools/audio_cache/<corner>.json`. Uses `fcntl.f
 
 ---
 
-## Model backend selector
+## Model transport
 
-Per [ADR-022](adr/022-openai-compatible-backend-selector.md) the paddock model
-client is selected at process start by `PITWALL_ADK_BACKEND`. The default is
-`litertlm` — existing deployments need no change.
+Per [ADR-024](adr/024-localllm-sole-llm-transport.md) (superseding
+[ADR-022](adr/022-openai-compatible-backend-selector.md)) the paddock tier
+has a **single** transport — `LiteLlm` dialling LocalLLM on
+`127.0.0.1:8099/v1`. There is no env-selectable alternative; reaching a
+different OpenAI-compatible server (Ollama, LM Studio, llama.cpp `--server`,
+vLLM, …) is done by pointing `PITWALL_ADK_OPENAI_URL` at it.
 
 ```python
-# adk_agents.py — module load
-_BACKEND  = os.getenv("PITWALL_ADK_BACKEND", "openai").lower()
+# adk_agents.py — module load (ADR-024)
 _MODEL_ID = get_env_with_legacy(
     "PITWALL_ADK_OPENAI_MODEL", "PITWALL_LITERT_MODEL", "gemma3n-e2b")
 _MODEL_URL = get_env_with_legacy(
     "PITWALL_ADK_OPENAI_URL", "PITWALL_LITERT_URL",
     "http://localhost:8099/v1")
-
-if _BACKEND == "engine":
-    _model = LitertLmModel(model=_MODEL_ID)               # in-process
-elif _BACKEND == "openai":
-    _model = LiteLlm(                                      # OpenAI-compatible HTTP
-        model=_MODEL_ID,
-        api_base=_MODEL_URL,
-        api_key=get_env_with_legacy(
-            "PITWALL_ADK_OPENAI_API_KEY", "PITWALL_LITERT_API_KEY",
-            "lit-serve-not-required"),
-    )
-else:                                                      # default: lit serve
-    _model = Gemini(model=_MODEL_ID, base_url=_MODEL_URL)
+_LITELLM_MODEL = _MODEL_ID if "/" in _MODEL_ID else f"openai/{_MODEL_ID}"
+_model = LiteLlm(
+    model=_LITELLM_MODEL,                              # litellm provider prefix
+    api_base=_MODEL_URL,                               # → LocalLLM at :8099/v1
+    api_key=get_env_with_legacy(
+        "PITWALL_ADK_OPENAI_API_KEY", "PITWALL_LITERT_API_KEY",
+        "lit-serve-not-required"),
+)
 ```
 
 ### Environment variables
 
-| Variable                       | Default                              | Used by                          |
+| Variable                       | Default                              | Purpose                          |
 | ------------------------------ | ------------------------------------ | -------------------------------- |
-| `PITWALL_ADK_BACKEND`          | `openai`                             | selector (`engine` \| `litertlm` \| `openai`) |
-| `PITWALL_ADK_OPENAI_URL`       | `http://localhost:8099/v1`           | `litertlm`, `openai` (HTTP base); shared with the warm-path `LitertCoach`. Legacy: `PITWALL_LITERT_URL` |
-| `PITWALL_ADK_OPENAI_MODEL`     | `gemma3n-e2b`                        | model id (must match what LocalLLM has loaded). Legacy: `PITWALL_LITERT_MODEL` |
-| `PITWALL_ADK_OPENAI_API_KEY`   | `lit-serve-not-required`             | `openai` — set to LocalLLM's signed bearer token. Legacy: `PITWALL_LITERT_API_KEY` |
-| `PITWALL_LITERT_SIDECAR_URL`   | `http://127.0.0.1:8080`              | LiteRT-LM Kotlin sidecar URL (`engine` backend). Legacy: `PITWALL_LITERTLM_URL` |
-| `PITWALL_LITERT_SIDECAR_MODEL` | `gemma-4-e2b`                        | LiteRT-LM Kotlin sidecar model id. Legacy: `PITWALL_LITERTLM_MODEL` |
-| `PITWALL_LITERTLM_PATH`        | *(unset)*                            | `engine` (`.litertlm` bundle path) |
-| `PITWALL_LITERTLM_BUDGET`      | `30000`                              | `engine` (KV-cache char budget)  |
-| `PITWALL_LITERT_HTTP_TIMEOUT_S` | `30`                                | warm-path HTTP client timeout    |
+| `PITWALL_ADK_OPENAI_URL`       | `http://localhost:8099/v1`           | LocalLLM endpoint; shared with the warm-path `LitertCoach`. Legacy: `PITWALL_LITERT_URL` |
+| `PITWALL_ADK_OPENAI_MODEL`     | `gemma3n-e2b`                        | Model id (must match what LocalLLM has loaded). Legacy: `PITWALL_LITERT_MODEL` |
+| `PITWALL_ADK_OPENAI_API_KEY`   | `lit-serve-not-required`             | LocalLLM signed bearer token. Legacy: `PITWALL_LITERT_API_KEY` |
+| `PITWALL_ADK_TIMEOUT_S`        | `45`                                 | Per-request timeout |
+| `PITWALL_ADK_CHAR_BUDGET`      | `60000`                              | ADK session rotation char budget |
+| `PITWALL_LITERT_HTTP_TIMEOUT_S` | `30`                                | Warm-path HTTP client timeout    |
 
-> **Legacy aliases (`PITWALL_LITERT_URL`, `PITWALL_LITERT_MODEL`,
-> `PITWALL_LITERT_API_KEY`, `PITWALL_LITERTLM_URL`, `PITWALL_LITERTLM_MODEL`)
-> are still read for backward compatibility — they emit a `DeprecationWarning`
-> on first use.** The rename clarifies that the `PITWALL_ADK_OPENAI_*` family
-> configures the ADK→OpenAI-compatible HTTP shim, while the
-> `PITWALL_LITERT_SIDECAR_*` family configures the Kotlin LiteRT-LM sidecar.
+Retired by ADR-024: `PITWALL_ADK_BACKEND`, `PITWALL_LITERTLM_PATH`,
+`PITWALL_LITERTLM_BUDGET`. The legacy `PITWALL_LITERT_*` aliases on
+`URL` / `MODEL` / `API_KEY` are still read (with a `DeprecationWarning` on
+first use) via `pitwall._env.get_env_with_legacy`.
 
-> **Default flipped 2026-05-12 (ADR-022).** Defaults now point at LocalLLM
-> (`:8099/v1`). To restore the previous `lit serve` behaviour explicitly:
-> `PITWALL_ADK_BACKEND=litertlm PITWALL_ADK_OPENAI_URL=http://localhost:8001`.
-
-### Choosing a backend
-
-| Backend     | Pick when                                                                                | Skip when                                              |
-| ----------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `openai`    | **Pixel field deployment with LocalLLM** — also: dev box with Ollama / LM Studio / vLLM. | You haven't installed LocalLLM and don't have any OpenAI-compat server running. |
-| `engine`    | Termux/Pixel deployment where you want one process and don't want to install LocalLLM.   | You're already running LocalLLM — use `openai` instead. |
-| `litertlm`  | Desktop dev with `lit serve` already up; legacy compatibility.                           | You don't have `lit serve` running locally.            |
-
-### What's identical across backends
+### What's load-bearing identical to ADR-019/021
 
 - The 18 agents, the orchestrator, the pipelines, all 15 tools.
 - KV-cache reuse via persistent ADK sessions per driver.
 - The `agent_traces` DuckDB schema and `PitwallTracingPlugin` hook.
 - The `[EMOTION:x]` tag contract in every system prompt.
-- The privacy guarantee — every backend speaks to a model on the same host as the bridge.
-
-### What differs
-
-- `engine` skips the HTTP hop entirely and shares process memory with the warm-path coach.
-- `openai` uses `LiteLlm` (litellm) which normalises tool-call shape from OpenAI to ADK's internal schema. ADK handles this transparently; the agents see the same tool-call objects either way.
-- `litertlm` uses Gemini-native function-calling shape directly to `lit serve`.
+- The privacy guarantee — `LiteLlm` speaks only to the configured `api_base`, which defaults to `127.0.0.1`.
+- `LiteLlm` (litellm) normalises tool-call shape from OpenAI to ADK's internal schema; agents see ADK-shaped tool calls regardless of which OpenAI-compatible server is on the other end.
 
 ---
 
@@ -416,12 +442,18 @@ get_pending_traces() -> list[dict]             # drain trace buffer for DuckDB w
 ## KV cache and persistent sessions
 
 KV reuse happens at the ADK session layer — pitwall keeps the same
-`InMemorySessionService` session alive per driver per process, so every
-backend benefits:
+`InMemorySessionService` session alive per driver per process. The actual
+KV-cache reuse then depends on the upstream OpenAI-compatible server:
 
-- **`engine`** — `LitertLmModel` keeps a Conversation per system prompt; reused turns skip system-instruction prefill (~30–50% cheaper). Direct in-process API, no transport cost.
-- **`litertlm`** — `lit serve` clones KV tensors for a reused session (<10 ms) rather than re-prefilling the system instruction tokens.
-- **`openai`** — depends on the upstream server. Ollama and llama.cpp's `--server` both keep a per-context KV slot warm; vLLM exposes prefix caching. ADK's session reuse keeps the prompt prefix stable, which is what those servers key on.
+- **LocalLLM (production target)** — LiteRT-LM 0.11 keeps a per-context KV
+  slot warm across turns; reused sessions skip system-instruction prefill.
+- **Ollama / llama.cpp `--server`** — same per-context KV reuse.
+- **vLLM** — exposes prefix caching keyed on the prompt prefix, which ADK's
+  session reuse keeps stable.
+
+In all cases ADK's persistent-session strategy guarantees the prompt prefix
+the upstream server sees is byte-identical across turns, which is the
+precondition every implementation keys on.
 
 ```
 _driver_sessions: dict[str, str]    # user_id → ADK session_id
@@ -524,17 +556,19 @@ Q&A turns buffer in `_qa_histories` (in-memory, TTL = 1 hour) and flush to DuckD
 - `LitertCoach.propose()` — still delegates to `RuleCoach` per ADR-017
 - All existing Flask endpoints and their JSON contracts
 - `llm_friction` table — still receives LLM performance metadata
-- `litert_lm.Engine` in-process runtime (E2B, hot path)
+- `RuleCoach` + canonical phrase library (hot path)
 
 ---
 
 ## Startup recipes
 
-### A. `openai` — Pixel 10 + LocalLLM APK *(recommended)*
+### A. Pixel 10 + LocalLLM APK *(production)*
 
-The production deployment story: install [LocalLLM](https://github.com/mlnomadpy/localllm)
-as a regular Android APK, pick a Gemma 4 `.litertlm` from its in-app catalog,
-and let the bridge in Termux speak to it over `127.0.0.1`.
+Install [LocalLLM](https://github.com/mlnomadpy/localllm) as a regular
+Android APK, pick a Gemma 4 `.litertlm` from its in-app catalog, copy the
+bearer token from its Settings screen, and let the bridge in Termux talk to
+it over `127.0.0.1`. `google-adk` and `litellm` are base deps of
+`apps/edge-daemon`, so a fresh `uv sync` is all you need.
 
 ```bash
 # On the Pixel — one-time setup:
@@ -545,64 +579,32 @@ and let the bridge in Termux speak to it over `127.0.0.1`.
 #   3. LocalLLM autostarts its HTTP server on :8099 with a signed bearer token
 #   4. Copy the bearer token from LocalLLM → Settings
 
-# In a Termux shell — pip install 'google-adk[litellm]' once, then:
-PITWALL_ADK_BACKEND=openai \
+# In a Termux shell (deps already resolved by uv sync):
 PITWALL_ADK_OPENAI_URL=http://localhost:8099/v1 \
 PITWALL_ADK_OPENAI_MODEL=gemma-4-e2b-it \
 PITWALL_ADK_OPENAI_API_KEY="<paste-token-from-LocalLLM-Settings>" \
-python3 -m src.pitwall \
+python3 -m pitwall \
     --litert-model ~/storage/shared/Pitwall/models/gemma-4-E2B-it.litertlm
 # Legacy aliases still work: PITWALL_LITERT_URL / PITWALL_LITERT_MODEL /
 # PITWALL_LITERT_API_KEY — they emit a DeprecationWarning on first use.
 ```
 
 The bridge sends `POST /v1/chat/completions` to LocalLLM with the bearer
-token. LocalLLM streams the response via SSE. Two APKs, one phone, one
+token; LocalLLM streams the response via SSE. Two APKs, one phone, one
 localhost hop, zero cloud. The hot-path E2B engine still loads in-process
 in the bridge for the < 100 ms warm/hot tier — only the paddock LLM moves
 to LocalLLM.
 
-### B. `engine` — Pixel 10 collapsed to one process
+### B. Dev workstation with Ollama / LM Studio / llama.cpp / vLLM
 
-If you don't want a second APK on the phone, the bridge can host the
-paddock model itself in-process, reusing the warm-path engine:
-
-```bash
-PITWALL_ADK_BACKEND=engine \
-PITWALL_LITERTLM_PATH=~/storage/shared/Pitwall/models/gemma-4-E2B-it.litertlm \
-python3 -m src.pitwall
-```
-
-No LocalLLM, no `lit serve`. One model resident in the bridge's process.
-The trade-off: no GPU delegate access from inside Termux, and a model-
-runtime crash takes the bridge down with it.
-
-### C. `litertlm` — desktop dev with `lit serve` *(legacy / default)*
-
-The original ADK doc'd path. Kept for desktop development and for any
-existing deployment that's already wired this way.
-
-```bash
-# Terminal 1
-lit pull gemma-4-e4b
-lit serve --port 8001
-
-# Terminal 2 — PITWALL_ADK_BACKEND defaults to "litertlm"
-cd ~/pitwall
-python3 -m src.pitwall
-```
-
-### D. `openai` — dev machine with Ollama / LM Studio / vLLM
-
-Same `openai` backend, different OpenAI-compatible server. Useful for
-authoring prompts on a laptop without installing LocalLLM:
+Same transport, different OpenAI-compatible server. Point
+`PITWALL_ADK_OPENAI_URL` at whatever you've got running:
 
 ```bash
 # Ollama (macOS)
-PITWALL_ADK_BACKEND=openai \
 PITWALL_ADK_OPENAI_URL=http://localhost:11434/v1 \
 PITWALL_ADK_OPENAI_MODEL=gemma2:2b \
-python3 -m src.pitwall
+python3 -m pitwall
 
 # LM Studio:    PITWALL_ADK_OPENAI_URL=http://localhost:1234/v1
 # llama.cpp:    PITWALL_ADK_OPENAI_URL=http://localhost:8080/v1
@@ -610,4 +612,10 @@ python3 -m src.pitwall
 # (Legacy PITWALL_LITERT_URL still honoured with a DeprecationWarning.)
 ```
 
-Every backend dials only `localhost`. No hosted LLM is involved at any point.
+The bridge dials only `localhost`. No hosted LLM is involved at any point.
+
+> **Retired recipes (per [ADR-024](adr/024-localllm-sole-llm-transport.md)):**
+> the in-process `PITWALL_ADK_BACKEND=engine` path and the
+> separate-`lit serve` `PITWALL_ADK_BACKEND=litertlm` path were removed
+> post-Sonoma. If you have a deployment pinned to either, the migration is
+> always the same — install LocalLLM and point at it.

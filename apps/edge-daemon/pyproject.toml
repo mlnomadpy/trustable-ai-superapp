@@ -26,6 +26,12 @@ dependencies = [
     "duckdb>=1.0",
     "numpy>=1.26",
     "pyyaml>=6.0",
+    # ADK is the paddock tier per ADR-019–022. `litellm` is the LiteLlm
+    # transport for the default openai-compatible backend (LocalLLM on
+    # 127.0.0.1:8099/v1, ADR-022) — listed explicitly because google-adk
+    # 1.32 no longer exposes a [litellm] extra.
+    "google-adk>=1.32",
+    "litellm>=1.40",
 ]
 
 [project.optional-dependencies]
@@ -36,15 +42,12 @@ can = [
 ops = [
     "psutil>=5.9",            # used by the bridge's RSS monitor thread
 ]
-adk = [
-    "google-adk>=0.1",
-]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
 ]
 all = [
-    "pitwall[can,ops,adk,dev]",
+    "pitwall[can,ops,dev]",
 ]
 
 [project.scripts]

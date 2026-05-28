@@ -1,19 +1,20 @@
 """
-Unit tests for the ADK paddock backend (post-audit refactor — see ADR-021/022).
+Unit tests for the ADK paddock backend (see ADR-019–024).
 
-Tests are split into two layers:
+Two layers:
 
-1. **No-ADK layer** — exercises pure-Python helpers (regex router, SQL
-   allowlist, trace deque, corner bounds loader, bridge endpoints) without
-   needing `google-adk` installed. These run on every CI box.
-2. **ADK layer** — uses `pytest.importorskip("google.adk")` and stubs the
-   Runner / model so we can drive `run_adk()` end-to-end without `lit serve`.
+1. **Helpers layer** — pure-Python: regex router, SQL allowlist, trace deque,
+   corner bounds loader, bridge endpoints with stubbed `run_adk`.
+2. **ADK layer** — reloads `adk_agents` and exercises the real Runner /
+   PitwallTracingPlugin / session service with a stubbed model. `google-adk`
+   and `litellm` are base deps (ADR-024), so these always run.
 
-The ADK layer locks the four S-tier audit fixes:
+The ADK layer locks the audit fixes:
   - `Runner` is invoked (not the broken `BaseAgent.run()`)
   - `PitwallTracingPlugin` keys timestamps per agent (no ParallelAgent race)
   - `get_pending_traces(adk_session_id)` filters by session
   - `reset_driver_session` calls `delete_session` on the in-memory store
+  - sole transport is `LiteLlm` dialling LocalLLM
 """
 from __future__ import annotations
 
@@ -139,9 +140,7 @@ def test_intent_classifier_whole_flow_beats_corner():
     scripts that happened to name a corner.
     """
     import pitwall.features.coaching.adk_agents as adk_agents
-    classify = adk_agents._classify_intent if hasattr(adk_agents, "_classify_intent") else None
-    if classify is None:
-        pytest.skip("ADK not loaded; classifier lives in HAS_ADK branch")
+    classify = adk_agents._classify_intent
     # Whole-flow intents win when they appear alongside a corner reference.
     assert classify("brief me on T6") == "brief"
     assert classify("debrief at Turn 5") == "debrief"
@@ -160,9 +159,7 @@ def test_intent_classifier_mental_map_covers_consistency():
     'consistency' (noun), 'repeatability', and 'stable'. Widening this is
     important because those are the natural phrasings drivers reach for."""
     import pitwall.features.coaching.adk_agents as adk_agents
-    classify = adk_agents._classify_intent if hasattr(adk_agents, "_classify_intent") else None
-    if classify is None:
-        pytest.skip("ADK not loaded")
+    classify = adk_agents._classify_intent
     for phrase in (
         "how's my consistency?",
         "consistency through corners",
@@ -182,9 +179,7 @@ def test_intent_classifier_mental_map_covers_consistency():
 
 def test_intent_classifier_word_boundaries():
     import pitwall.features.coaching.adk_agents as adk_agents
-    classify = getattr(adk_agents, "_classify_intent", None)
-    if classify is None:
-        pytest.skip("ADK not loaded")
+    classify = adk_agents._classify_intent
     # Used to be substring-based: " t6" only matched with leading space.
     assert classify("T6 was scary") == "corner"
     assert classify("my Carousel time was off") == "corner"
@@ -195,9 +190,7 @@ def test_intent_classifier_word_boundaries():
 
 def test_intent_classifier_falls_back_to_telemetry():
     import pitwall.features.coaching.adk_agents as adk_agents
-    classify = getattr(adk_agents, "_classify_intent", None)
-    if classify is None:
-        pytest.skip("ADK not loaded")
+    classify = adk_agents._classify_intent
     assert classify("show me the data") == "telemetry"
     assert classify("") == "telemetry"
     assert classify(None) == "telemetry"
@@ -205,9 +198,7 @@ def test_intent_classifier_falls_back_to_telemetry():
 
 def test_intent_classifier_recognises_meta_questions():
     import pitwall.features.coaching.adk_agents as adk_agents
-    classify = getattr(adk_agents, "_classify_intent", None)
-    if classify is None:
-        pytest.skip("ADK not loaded")
+    classify = adk_agents._classify_intent
     assert classify("which agent is slowest right now?") == "agent_meta"
     assert classify("show agent latency for the last hour") == "agent_meta"
     # Generic 'tool call' shouldn't false-positive
@@ -223,7 +214,7 @@ def test_pending_traces_filter_by_session():
     rows; non-matching rows stay in the deque for their owner to drain.
     """
     import pitwall.features.coaching.adk_agents as adk_agents
-    # Module-level deque is defined regardless of HAS_ADK.
+    # Module-level deque, always defined.
     adk_agents._pending_traces.clear()
     adk_agents._pending_traces.append({"trace_id": "A", "agent_name": "x",
                                        "event_type": "agent", "detail": "",
@@ -301,65 +292,39 @@ def bridge_app(monkeypatch, tmp_path):
         @_adk_agent_registry.setter
         def _adk_agent_registry(self, value):
             pitwall.state.adk_agent_registry = value
-            
-        @property
-        def HAS_ADK(self):
-            return pitwall.state.has_adk
-            
-        @HAS_ADK.setter
-        def HAS_ADK(self, value):
-            pitwall.state.has_adk = value
-            
+
+        # `bp_coaching` did `from … import run_adk, stream_adk, …` at module
+        # load, so the live binding endpoints call is `bp_coaching.run_adk`,
+        # not `adk_agents.run_adk`. Patching the source module would leave the
+        # blueprint's stale reference in place. Target the importing module.
         @property
         def _run_adk(self):
-            return pitwall.features.coaching.adk_agents.run_adk
+            return pitwall.features.coaching.bp_coaching.run_adk
 
         @_run_adk.setter
         def _run_adk(self, value):
-            pitwall.features.coaching.adk_agents.run_adk = value
-            
+            pitwall.features.coaching.bp_coaching.run_adk = value
+
         @property
         def _drain_adk_traces(self):
             return pitwall.features.coaching.bp_coaching._drain_adk_traces
-            
+
         @_drain_adk_traces.setter
         def _drain_adk_traces(self, value):
             pitwall.features.coaching.bp_coaching._drain_adk_traces = value
-            
+
         @property
         def _stream_adk(self):
-            return pitwall.features.coaching.adk_agents.stream_adk
+            return pitwall.features.coaching.bp_coaching.stream_adk
 
         @_stream_adk.setter
         def _stream_adk(self, value):
-            pitwall.features.coaching.adk_agents.stream_adk = value
+            pitwall.features.coaching.bp_coaching.stream_adk = value
             
-    mock_bridge = MockBridge()
-    # Mocking the HAS_ADK flag that tests mutate. Importing the submodule
-    # explicitly because Python doesn't auto-load child modules just from
-    # the parent package being imported.
-    from pitwall.features.coaching import adk_agents as _adk
-    mock_bridge.HAS_ADK = _adk.HAS_ADK
-    return mock_bridge
+    return MockBridge()
 
 
-def test_coach_ask_returns_503_when_adk_disabled(bridge_app, monkeypatch):
-    monkeypatch.setattr(bridge_app, "HAS_ADK", False)
-    client = bridge_app.app.test_client()
-    resp = client.post("/coach/ask", json={"driver_id": "x", "question": "anything"})
-    assert resp.status_code == 503
-
-
-def test_coach_ask_stream_returns_503_when_adk_disabled(bridge_app, monkeypatch):
-    monkeypatch.setattr(bridge_app, "HAS_ADK", False)
-    client = bridge_app.app.test_client()
-    resp = client.post("/coach/ask/stream",
-                       json={"driver_id": "x", "question": "anything"})
-    assert resp.status_code == 503
-
-
-def test_coach_agents_lists_registry_when_present(bridge_app, monkeypatch):
-    monkeypatch.setattr(bridge_app, "HAS_ADK", True)
+def test_coach_agents_lists_registry(bridge_app, monkeypatch):
     monkeypatch.setattr(bridge_app, "_adk_agent_registry",
                         [{"name": "Demo", "role": "test"}])
     client = bridge_app.app.test_client()
@@ -372,7 +337,6 @@ def test_coach_agents_lists_registry_when_present(bridge_app, monkeypatch):
 
 def test_coach_ask_validates_question_present(bridge_app, monkeypatch):
     """Empty question must be rejected before reaching the model."""
-    monkeypatch.setattr(bridge_app, "HAS_ADK", True)
     # Stub _run_adk so a regression that bypasses validation fails loudly.
     def _should_not_be_called(*a, **kw):
         raise AssertionError("_run_adk called for empty question")
@@ -395,7 +359,6 @@ def test_coach_ask_uses_intent_override(bridge_app, monkeypatch):
         captured["user_id"] = user_id
         captured["state_overrides"] = state_overrides
         return ("ok answer [EMOTION:focused]", "fake-sid")
-    monkeypatch.setattr(bridge_app, "HAS_ADK", True)
     monkeypatch.setattr(bridge_app, "_run_adk", fake_run)
     monkeypatch.setattr(bridge_app, "_drain_adk_traces", lambda **kw: None)
     client = bridge_app.app.test_client()
@@ -423,7 +386,6 @@ def test_coach_ask_no_intent_passes_no_overrides(bridge_app, monkeypatch):
     def fake_run(prompt, user_id="driver", state_overrides=None):
         captured["state_overrides"] = state_overrides
         return ("ok [EMOTION:neutral]", "sid")
-    monkeypatch.setattr(bridge_app, "HAS_ADK", True)
     monkeypatch.setattr(bridge_app, "_run_adk", fake_run)
     monkeypatch.setattr(bridge_app, "_drain_adk_traces", lambda **kw: None)
     client = bridge_app.app.test_client()
@@ -440,12 +402,11 @@ def test_coach_ask_drain_filters_by_adk_session(bridge_app, monkeypatch):
     _run_adk so concurrent requests do not steal each other's traces.
     """
     drained = {}
-    def fake_run(prompt, user_id="driver"):
+    def fake_run(prompt, user_id="driver", state_overrides=None):
         return ("answer [EMOTION:neutral]", "adk-sid-42")
     def fake_drain(adk_session_id=None, pitwall_sid=""):
         drained["adk_session_id"] = adk_session_id
         drained["pitwall_sid"] = pitwall_sid
-    monkeypatch.setattr(bridge_app, "HAS_ADK", True)
     monkeypatch.setattr(bridge_app, "_run_adk", fake_run)
     monkeypatch.setattr(bridge_app, "_drain_adk_traces", fake_drain)
     client = bridge_app.app.test_client()
@@ -458,9 +419,8 @@ def test_coach_ask_drain_filters_by_adk_session(bridge_app, monkeypatch):
 def test_coach_ask_stream_emits_sse_chunks(bridge_app, monkeypatch):
     """The /coach/ask/stream endpoint should emit `data:` lines per chunk
     plus a terminal {"done": true, ...} payload."""
-    monkeypatch.setattr(bridge_app, "HAS_ADK", True)
     monkeypatch.setattr(bridge_app, "_stream_adk",
-                        lambda prompt, user_id="driver": iter([
+                        lambda prompt, user_id="driver", state_overrides=None: iter([
                             "Hello ", "world. ", "[EMOTION:encouraging]",
                         ]))
     client = bridge_app.app.test_client()
@@ -482,69 +442,39 @@ def test_coach_ask_stream_emits_sse_chunks(bridge_app, monkeypatch):
 # ════════════════════════════════════════════════════════════════════════════
 
 
-# All tests below skip if google-adk isn't installed.
-pytestmark_adk = pytest.mark.usefixtures()
-adk = pytest.importorskip("google.adk", reason="google-adk not installed",
-                          allow_module_level=False) if False else None
-
-
 @pytest.fixture
 def adk_module():
-    pytest.importorskip("google.adk")
-    pytest.importorskip("litellm")
     import importlib
     import pitwall.features.coaching.adk_agents as adk_agents
     importlib.reload(adk_agents)
-    if not adk_agents.HAS_ADK:
-        pytest.skip("ADK loaded but coach_orchestrator not built")
     return adk_agents
 
 
-def test_adk_module_loads_18_agents(adk_module):
-    assert adk_module.HAS_ADK is True
+def test_adk_module_loads_full_topology(adk_module):
     assert adk_module.coach_orchestrator is not None
-    assert len(adk_module.AGENT_REGISTRY) == 17  # specialists; pipelines absent
+    # ADR-026: phase-2 expansion added 6 specialists (Tire / Handling /
+    # EngineHealth / Traction / InputQuality / Safety) on top of the
+    # original 17.
+    assert len(adk_module.AGENT_REGISTRY) == 23
     names = {a["name"] for a in adk_module.AGENT_REGISTRY}
-    for required in ["TelemetryAgent", "PitwallOrchestrator",
-                     "AgentMetaAgent", "VoiceScriptAgent"]:
-        if required == "PitwallOrchestrator":
-            continue  # orchestrator isn't in the registry
-        assert required in names
+    for required in [
+        "TelemetryAgent", "AgentMetaAgent", "VoiceScriptAgent",
+        "TireManagerAgent", "HandlingBalanceAgent", "EngineHealthAgent",
+        "TractionAgent", "InputQualityAgent", "SafetyMonitorAgent",
+    ]:
+        assert required in names, f"missing agent {required!r}"
 
 
-def test_adk_default_backend_is_litertlm_gemini(adk_module):
-    """Default backend is LiteRT-LM via ADK's Gemini(base_url=...).
+def test_adk_model_is_local_llm(adk_module):
+    """Sole transport: LiteLlm dialling LocalLLM (ADR-024).
 
-    Documented at https://adk.dev/agents/models/litert-lm/. The Gemini class
-    in ADK speaks LiteRT-LM's protocol when base_url is set — it's not
-    Vertex/Gemini API. Picked because `lit serve` (the LiteRT-LM CLI) is the
-    on-device, NPU-capable model server on Pixel/Termux.
+    Locks the consolidation — if anyone reintroduces `Gemini(base_url=...)`
+    or an in-process `LitertLmModel` branch, this test fails.
     """
-    from google.adk.models import Gemini
-    assert isinstance(adk_module._model, Gemini)
-    assert adk_module._BACKEND == "litertlm"
-
-
-def test_adk_openai_backend_uses_litellm(monkeypatch):
-    """PITWALL_ADK_BACKEND=openai swaps in LiteLlm for any OpenAI-compatible
-    local server (Ollama, llama.cpp, vLLM, …)."""
-    pytest.importorskip("litellm")
-    monkeypatch.setenv("PITWALL_ADK_BACKEND", "openai")
-    monkeypatch.setenv("PITWALL_ADK_OPENAI_MODEL", "openai/gemma-4-e4b")
-    monkeypatch.setenv("PITWALL_ADK_OPENAI_URL", "http://localhost:11434/v1")
-    # Clear legacy names so a deprecation warning from a shell-set legacy
-    # var doesn't bleed into this assertion path.
-    monkeypatch.delenv("PITWALL_LITERT_MODEL", raising=False)
-    monkeypatch.delenv("PITWALL_LITERT_URL", raising=False)
-    import importlib
-    from pitwall.features.coaching import adk_agents
-    importlib.reload(adk_agents)
     from google.adk.models.lite_llm import LiteLlm
-    assert isinstance(adk_agents._model, LiteLlm)
-    assert adk_agents._BACKEND == "openai"
-    # Reset to default for downstream tests.
-    monkeypatch.delenv("PITWALL_ADK_BACKEND", raising=False)
-    importlib.reload(adk_agents)
+    assert isinstance(adk_module._model, LiteLlm)
+    assert adk_module._model.model.startswith("openai/"), \
+        "model id must carry the openai/ provider prefix for litellm routing"
 
 
 def test_adk_pipelines_use_distinct_pedagogy_instances(adk_module):
@@ -564,7 +494,7 @@ def test_adk_run_returns_tuple_with_session_id(adk_module, monkeypatch):
     """run_adk() must return (text, session_id). A regression to a bare
     string would re-break trace filtering in the bridge."""
     # Stub _run_adk_async so we don't need a real model/server.
-    async def fake(prompt, user_id):
+    async def fake(prompt, user_id, state_overrides=None):
         return ("hello world [EMOTION:neutral]", "fake-sid-xyz")
     monkeypatch.setattr(adk_module, "_run_adk_async", fake)
     out = adk_module.run_adk("hi", user_id="u")
@@ -577,7 +507,7 @@ def test_adk_run_returns_tuple_with_session_id(adk_module, monkeypatch):
 def test_adk_run_timeout_raises(adk_module, monkeypatch):
     """A wedged lit serve must not block Flask forever."""
     import asyncio
-    async def fake(prompt, user_id):
+    async def fake(prompt, user_id, state_overrides=None):
         await asyncio.sleep(5)
         return ("never", "x")
     monkeypatch.setattr(adk_module, "_run_adk_async", fake)
@@ -597,7 +527,7 @@ def test_adk_session_rotation_at_char_budget(adk_module, monkeypatch):
     adk_module._driver_sessions.clear()
     adk_module._session_chars.clear()
 
-    async def fake(prompt, user_id):
+    async def fake(prompt, user_id, state_overrides=None):
         sess = await adk_module._get_or_create_session(user_id)
         # Burn 60 chars per call → over the 50-char budget after one call.
         with adk_module._driver_sessions_lock:
@@ -786,7 +716,7 @@ def test_orchestrator_rejects_invalid_override(adk_module, monkeypatch):
 
 def test_stream_adk_yields_chunks(adk_module, monkeypatch):
     """Audit A-tier #7: stream_adk must produce token chunks from the model."""
-    async def fake_stream(prompt, user_id):
+    async def fake_stream(prompt, user_id, state_overrides=None):
         for chunk in ["one ", "two ", "three"]:
             yield chunk
 
@@ -798,7 +728,7 @@ def test_stream_adk_yields_chunks(adk_module, monkeypatch):
 def test_stream_adk_timeout_raises(adk_module, monkeypatch):
     """A wedged stream must time out instead of blocking forever."""
     import asyncio
-    async def fake_stream(prompt, user_id):
+    async def fake_stream(prompt, user_id, state_overrides=None):
         await asyncio.sleep(5)
         yield "never"
     monkeypatch.setattr(adk_module, "_stream_adk_async", fake_stream)

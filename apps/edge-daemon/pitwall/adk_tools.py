@@ -18,10 +18,15 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     import duckdb  # noqa: F401
 
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+# Monorepo root — data/ lives at the repo root, not under apps/edge-daemon/
+# after the V2 consolidation. From apps/edge-daemon/pitwall/adk_tools.py
+# that's three levels up (pitwall → edge-daemon → apps → repo root).
+_PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
 DB_PATH = os.path.join(_PROJECT_ROOT, "data", "pitwall_sessions.duckdb")
 
-# src/simulator is a sibling package under src/
+# simulator/ is a sibling of pitwall/ inside apps/edge-daemon/.
 _SIM_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "simulator"))
 if _SIM_DIR not in sys.path:
     sys.path.insert(0, _SIM_DIR)
@@ -30,13 +35,11 @@ _GOLD_PATH = os.path.abspath(
     os.path.join(_PROJECT_ROOT, "data", "reference", "sonoma_gold.json")
 )
 
-try:
-    from google.adk.tools import tool as _adk_tool
-    HAS_ADK_TOOLS = True
-except ImportError:
-    def _adk_tool(fn):  # type: ignore[misc]
-        return fn
-    HAS_ADK_TOOLS = False
+# ADK 1.32 doesn't export a `tool` decorator — functions are registered by
+# being passed into `Agent(tools=[...])` directly. This passthrough keeps the
+# `@_adk_tool` call sites below as legible markers without claiming an import.
+def _adk_tool(fn):  # type: ignore[misc]
+    return fn
 
 
 def _db():
@@ -50,11 +53,21 @@ def _db():
 
 
 def _q(sql: str, params: list | None = None) -> list[dict[str, Any]]:
-    if not os.path.exists(DB_PATH):
-        return []
+    # `_db()` → `get_db()` returns None when no backend is reachable
+    # (state.has_duckdb is False) — that's the right "empty" signal because
+    # tests rebind state.db_path to tmp files and the module-level DB_PATH
+    # constant goes stale.
     conn = _db()
+    if conn is None:
+        return []
     try:
-        res = conn.execute(sql, params or [])
+        try:
+            res = conn.execute(sql, params or [])
+        except Exception as exc:
+            # Return as an error row so the agent can recover instead of
+            # propagating an exception into ADK's parallel TaskGroup
+            # (which kills the whole DebriefPipeline data phase).
+            return [{"error": f"{type(exc).__name__}: {exc}"}]
         cols = [desc[0] for desc in res.description]
         rows = res.fetchall()
         return [dict(zip(cols, row)) for row in rows]
@@ -726,7 +739,535 @@ def get_track_variance_map(session_id: str) -> dict[str, Any]:
     }
 
 
-# ── 14. Agent telemetry query tool ────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# Tall-sink helpers — used by the AiM-pipeline-aware tools below to fetch
+# canonical signal values from `telemetry_signals` JOINed via `signal_registry`.
+# All AiM canonical names match the YAML pipeline (data/cars/bmw_e46_m3.yaml).
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _signal_rows(session_id: str, names: list[str]) -> list[dict[str, Any]]:
+    """Return (name, t, value) rows for the given canonical signal names."""
+    if not names:
+        return []
+    placeholders = ",".join("?" * len(names))
+    return _q(
+        f"SELECT sr.name AS name, ts.t AS t, ts.value AS v "
+        f"FROM telemetry_signals ts "
+        f"JOIN signal_registry sr ON sr.signal_id = ts.signal_id "
+        f"WHERE ts.session_id = ? AND sr.name IN ({placeholders}) "
+        f"ORDER BY ts.t",
+        [session_id, *names],
+    )
+
+
+def _signal_aggregate(session_id: str, name: str, *,
+                      lo: float | None = None, hi: float | None = None
+                      ) -> dict[str, Any] | None:
+    """Return {min, max, avg, n} for one canonical signal, sentinel-clamped.
+
+    Pass `lo`/`hi` to clip the documented AiM sentinels (0xFFFF / 0x7FFFFFFF
+    pass-throughs that the bridge's YAML pipeline doesn't filter — see
+    data/cars/bmw_e46_m3.yaml §8 known_constraints).
+    """
+    clauses = ["ts.session_id = ?", "sr.name = ?"]
+    params: list[Any] = [session_id, name]
+    if lo is not None:
+        clauses.append("ts.value >= ?"); params.append(lo)
+    if hi is not None:
+        clauses.append("ts.value <= ?"); params.append(hi)
+    rows = _q(
+        f"SELECT MIN(ts.value) AS mn, MAX(ts.value) AS mx, "
+        f"AVG(ts.value) AS av, COUNT(*) AS n "
+        f"FROM telemetry_signals ts "
+        f"JOIN signal_registry sr ON sr.signal_id = ts.signal_id "
+        f"WHERE {' AND '.join(clauses)}",
+        params,
+    )
+    if not rows or rows[0]["n"] == 0:
+        return None
+    r = rows[0]
+    return {
+        "min": round(r["mn"], 3) if r["mn"] is not None else None,
+        "max": round(r["mx"], 3) if r["mx"] is not None else None,
+        "avg": round(r["av"], 3) if r["av"] is not None else None,
+        "samples": int(r["n"]),
+    }
+
+
+# ── 14. Tire thermal window tool (AiM TPMS) ───────────────────────────────────
+
+@_adk_tool
+def get_tire_thermal_window(session_id: str) -> dict[str, Any]:
+    """Per-corner tire pressure / temperature window + alarm timeline.
+
+    Reads the four AiM TrailBrake TPMS signals per corner (pressure bar,
+    temperature C, alarm bitfield) from `telemetry_signals` via
+    `signal_registry`. Returns cold-start vs hot-peak deltas — the basis for
+    cold-pressure target advice next session.
+
+    YAML alarm bitfield (data/cars/bmw_e46_m3.yaml §6, 0x45D):
+        bit0 = air leak
+        bit4 = low temperature (tire never reached operating window)
+        bit5 = sensor fail
+    """
+    corners = ["fl", "fr", "rl", "rr"]
+    out: dict[str, Any] = {"session_id": session_id, "per_corner": {}, "alarms": []}
+    for c in corners:
+        p = _signal_aggregate(session_id, f"tpms_press_{c}_bar", lo=0.5, hi=5.0)
+        t = _signal_aggregate(session_id, f"tpms_temp_{c}_c",    lo=0.0, hi=160.0)
+        if p is None and t is None:
+            continue
+        # Use the first/last sample for cold→hot delta (tall sink is t-ordered).
+        seq = _signal_rows(session_id, [f"tpms_press_{c}_bar"])
+        cold_p = round(seq[0]["v"], 2) if seq else None
+        hot_p  = round(seq[-1]["v"], 2) if seq else None
+        out["per_corner"][c] = {
+            "pressure_bar": p, "temperature_c": t,
+            "cold_pressure_bar": cold_p,
+            "final_pressure_bar": hot_p,
+            "delta_bar": (round(hot_p - cold_p, 2)
+                          if (cold_p is not None and hot_p is not None) else None),
+        }
+    # Alarms — non-zero bitfields are notable events.
+    alarm_rows = _q(
+        "SELECT sr.name AS name, ts.t AS t, ts.value AS v "
+        "FROM telemetry_signals ts JOIN signal_registry sr "
+        "ON sr.signal_id = ts.signal_id "
+        "WHERE ts.session_id = ? AND sr.name LIKE 'tpms_alm_%' "
+        "AND ts.value > 0 ORDER BY ts.t LIMIT 50",
+        [session_id],
+    )
+    for r in alarm_rows:
+        bits = int(r["v"])
+        flags: list[str] = []
+        if bits & 0x01: flags.append("air_leak")
+        if bits & 0x10: flags.append("low_temp")
+        if bits & 0x20: flags.append("sensor_fail")
+        out["alarms"].append({"corner": r["name"][-2:], "t": r["t"], "flags": flags})
+    out["alarm_count"] = len(out["alarms"])
+    return out
+
+
+# ── 15. Handling balance tool (AiM gyro + steering) ───────────────────────────
+
+# BMW E46 M3 chassis constants — from BMW factory spec.
+_E46_M3_WHEELBASE_M = 2.731
+_E46_M3_STEERING_RATIO = 15.4   # steering wheel deg → road-wheel deg
+
+
+def _track_length_m() -> float:
+    """Sonoma canonical lap length, used to fold cumulative distance into one lap."""
+    try:
+        from pitwall.features.track.sonoma import TRACK_LENGTH_M
+        return float(TRACK_LENGTH_M)
+    except Exception:
+        return 4258.0
+
+
+@_adk_tool
+def get_handling_balance(session_id: str, corner_name: str = "") -> dict[str, Any]:
+    """Measured yaw rate vs. expected yaw rate per corner.
+
+    expected_yaw_dps = (V_ms × tan(road_wheel_rad)) / wheelbase_m × (180/π)
+    where road_wheel_rad = steering_wheel_deg / steering_ratio.
+
+    balance > 1 → oversteer (car rotating more than steering commands)
+    balance < 1 → understeer (front washing; steer input not producing yaw)
+    balance ≈ 1 ±0.05 → neutral
+
+    Computed per Sonoma corner window from data/tracks/sonoma.json bounds.
+    Pass `corner_name` to restrict the analysis to one corner.
+    """
+    try:
+        bounds = _load_corner_bounds()
+    except Exception as e:
+        return {"error": f"corner bounds: {e}"}
+
+    if corner_name and corner_name not in bounds:
+        return {"error": f"unknown corner '{corner_name}'. "
+                         f"Known: {sorted(bounds.keys())}"}
+    targets = {corner_name: bounds[corner_name]} if corner_name else bounds
+
+    out_corners: list[dict[str, Any]] = []
+    lap_m = _track_length_m()
+    conn = _db()
+    if conn is None:
+        return {"error": "no database"}
+    try:
+        for corner, (d_start, d_end) in targets.items():
+            # Multi-lap sessions store cumulative distance (0 → 11 × lap_m).
+            # Fold to lap-relative with MOD so the corner bound matches every lap.
+            # Wide-row gives speed/steer at 10 Hz; yaw_rate lives in the tall
+            # sink at 50 Hz, pulled via a ±50ms correlated subquery.
+            rows = conn.execute(
+                "SELECT t.frame_idx, t.distance_m, t.speed_ms, t.steering_deg, "
+                "  t.g_lat, "
+                "  (SELECT ts.value FROM telemetry_signals ts "
+                "   JOIN signal_registry sr ON sr.signal_id = ts.signal_id "
+                "   WHERE ts.session_id = t.session_id "
+                "   AND sr.name = 'yaw_rate_degs' "
+                "   AND ts.t BETWEEN t.timestamp - 0.05 AND t.timestamp + 0.05 "
+                "   LIMIT 1) AS yaw_dps "
+                "FROM telemetry t WHERE t.session_id = ? "
+                "AND (t.distance_m - ? * CAST(t.distance_m / ? AS INTEGER)) "
+                "  BETWEEN ? AND ? "
+                "AND ABS(t.steering_deg) > 5 AND t.speed_ms > 8",
+                [session_id, lap_m, lap_m, d_start, d_end],
+            ).fetchall()
+            import math
+            ratios: list[float] = []
+            counter_steer = 0
+            for fidx, dist, v_ms, steer, g_lat, yaw_meas in rows:
+                if yaw_meas is None or v_ms is None or steer is None:
+                    continue
+                # Road-wheel angle from steering wheel angle ÷ ratio.
+                rw_deg = steer / _E46_M3_STEERING_RATIO
+                # Bicycle model: expected_yaw_dps = V × tan(rw) / wheelbase, rad→deg.
+                expected = (v_ms * math.tan(math.radians(rw_deg))
+                            / _E46_M3_WHEELBASE_M * 180.0 / math.pi)
+                if abs(expected) < 3:   # straight-line noise floor
+                    continue
+                if (expected > 0) != (yaw_meas > 0):
+                    counter_steer += 1   # opposite-sign = counter-steer / oversteer save
+                ratios.append(abs(yaw_meas) / abs(expected))
+            if not ratios:
+                continue
+            mean_balance = sum(ratios) / len(ratios)
+            verdict = ("oversteer" if mean_balance > 1.10
+                       else "understeer" if mean_balance < 0.90
+                       else "neutral")
+            out_corners.append({
+                "corner": corner,
+                "balance_ratio": round(mean_balance, 3),
+                "verdict": verdict,
+                "magnitude_pct": round(abs(mean_balance - 1.0) * 100, 1),
+                "counter_steer_events": counter_steer,
+                "samples": len(ratios),
+            })
+    finally:
+        conn.close()
+    out_corners.sort(key=lambda r: abs(r["balance_ratio"] - 1.0), reverse=True)
+    total_samples = sum(c["samples"] for c in out_corners)
+    total_cs = sum(c["counter_steer_events"] for c in out_corners)
+    sign_warning = ""
+    if total_samples and total_cs / total_samples > 0.5:
+        sign_warning = (" CALIBRATION: counter_steer_events > 50% of samples "
+                        "suggests the YAML §7 sign-convention verify-on-first-"
+                        "capture step hasn't been applied — steering and yaw "
+                        "rate are sign-flipped vs. bicycle-model expectation. "
+                        "Absolute balance numbers are inflated; ranking by "
+                        "magnitude is still meaningful.")
+    return {
+        "session_id": session_id,
+        "corners": out_corners,
+        "most_under": next((c["corner"] for c in out_corners
+                            if c["verdict"] == "understeer"), None),
+        "most_over":  next((c["corner"] for c in out_corners
+                            if c["verdict"] == "oversteer"),  None),
+        "note": "balance > 1: car rotates more than steering commanded (oversteer). "
+                "balance < 1: front washing (understeer). "
+                "E46 M3 baseline: wheelbase 2.731m, steering ratio 15.4:1."
+                + sign_warning,
+    }
+
+
+# ── 16. Engine health timeline (AiM powertrain stream) ────────────────────────
+
+@_adk_tool
+def get_engine_health_timeline(session_id: str) -> dict[str, Any]:
+    """Engine-health summary across the session.
+
+    Reads oil_press_bar, water_press_bar, fuel_press_bar, engine_oil_temp_c,
+    water_temp_c, oil_filter_temp_c from the tall sink. Applies the AiM YAML
+    sentinel filter (0xFFFF → 4519 bar for psi-derived signals; data/cars/
+    bmw_e46_m3.yaml §8 known_constraints).
+
+    Anomaly detection:
+      - oil pressure < 1.5 bar under high g_lat (bearing starvation suspect)
+      - water temp climbing > 105 C
+      - fuel pressure dropping > 0.5 bar from session average (vapour lock risk)
+    """
+    # Sentinel ceilings — 0xFFFF scaled by the YAML's psi_to_bar (÷14.504).
+    PSI_SENTINEL_BAR = 200.0
+    TEMP_SENTINEL_C  = 200.0
+
+    summary: dict[str, dict | None] = {
+        "oil_press_bar":      _signal_aggregate(session_id, "oil_press_bar",
+                                                lo=0.0, hi=PSI_SENTINEL_BAR),
+        "water_press_bar":    _signal_aggregate(session_id, "water_press_bar",
+                                                lo=0.0, hi=PSI_SENTINEL_BAR),
+        "fuel_press_bar":     _signal_aggregate(session_id, "fuel_press_bar",
+                                                lo=0.0, hi=PSI_SENTINEL_BAR),
+        "engine_oil_temp_c":  _signal_aggregate(session_id, "engine_oil_temp_c",
+                                                lo=-40.0, hi=TEMP_SENTINEL_C),
+        "water_temp_c":       _signal_aggregate(session_id, "water_temp_c",
+                                                lo=-40.0, hi=TEMP_SENTINEL_C),
+        "oil_filter_temp_c":  _signal_aggregate(session_id, "oil_filter_temp_c",
+                                                lo=-40.0, hi=TEMP_SENTINEL_C),
+    }
+    anomalies: list[dict[str, Any]] = []
+    # Oil-pressure starvation: low oil_press samples that co-occur with high
+    # rpm AND non-zero throttle (engine under load). Idle low-pressure is
+    # normal on the M3's S54 (cold-start, in-pit) and was previously the
+    # source of false-positive "bearing starvation" alarms.
+    starvation = _q(
+        "SELECT COUNT(*) AS n FROM telemetry_signals ts_oil "
+        "JOIN signal_registry sr_oil ON sr_oil.signal_id = ts_oil.signal_id "
+        "JOIN telemetry t ON t.session_id = ts_oil.session_id "
+        "  AND ABS(t.timestamp - ts_oil.t) < 0.1 "
+        "WHERE ts_oil.session_id = ? AND sr_oil.name = 'oil_press_bar' "
+        "AND ts_oil.value > 0 AND ts_oil.value < 1.5 "
+        "AND t.rpm > 3000 AND t.throttle_pct > 10",
+        [session_id],
+    )
+    starve_n = (starvation[0].get("n") or 0) if starvation else 0
+    if starve_n > 0:
+        anomalies.append({
+            "kind": "oil_pressure_low_under_load",
+            "severity": "high" if starve_n > 50 else "medium",
+            "detail": f"oil pressure < 1.5 bar in {starve_n} samples while RPM > "
+                      "3000 and throttle > 10%. Investigate bearing windage / oil "
+                      "starvation under high lateral G.",
+        })
+    if summary["water_temp_c"] and (summary["water_temp_c"]["max"] or 0) > 105:
+        anomalies.append({
+            "kind": "coolant_high",
+            "severity": "high" if summary["water_temp_c"]["max"] > 115 else "medium",
+            "detail": f"water temp peaked at {summary['water_temp_c']['max']} C "
+                      "(>105 C threshold). Check airflow / radiator / cooling fan.",
+        })
+    return {
+        "session_id": session_id,
+        "vitals": {k: v for k, v in summary.items() if v is not None},
+        "anomalies": anomalies,
+        "anomaly_count": len(anomalies),
+        "note": "All pressures are sentinel-filtered against the AiM 0xFFFF "
+                "no-reading marker (YAML §8); raw query_pitwall_db on these "
+                "signals will include sentinel rows.",
+    }
+
+
+# ── 17. Traction events tool (AiM 4-corner wheel speeds) ──────────────────────
+
+@_adk_tool
+def get_traction_events(session_id: str, slip_threshold_kmh: float = 5.0
+                        ) -> dict[str, Any]:
+    """Wheelspin / lockup events from per-wheel speed deltas.
+
+    Wheelspin: rear-axle-avg overspeed vs. front-axle-avg under throttle.
+    Lockup:    front wheels under-revving vs. body speed under brake.
+    Both surfaced as event lists with time, corner-window, and slip magnitude.
+
+    `slip_threshold_kmh`: minimum front↔rear or body↔wheel gap (default 5 km/h)
+    above which a sample counts as a slip event.
+    """
+    try:
+        bounds = _load_corner_bounds()
+    except Exception:
+        bounds = {}
+
+    # Pull wheel-speed averages alongside wide-row throttle/brake/speed.
+    rows = _q(
+        "SELECT t.frame_idx, t.distance_m, t.speed_ms, t.throttle_pct, t.brake_bar, "
+        "  (SELECT AVG(ts.value) FROM telemetry_signals ts "
+        "   JOIN signal_registry sr ON sr.signal_id = ts.signal_id "
+        "   WHERE ts.session_id = t.session_id "
+        "   AND sr.name IN ('wheel_speed_rl_ms','wheel_speed_rr_ms') "
+        "   AND ts.t BETWEEN t.timestamp - 0.05 AND t.timestamp + 0.05) AS rear_ms, "
+        "  (SELECT AVG(ts.value) FROM telemetry_signals ts "
+        "   JOIN signal_registry sr ON sr.signal_id = ts.signal_id "
+        "   WHERE ts.session_id = t.session_id "
+        "   AND sr.name IN ('wheel_speed_fl_ms','wheel_speed_fr_ms') "
+        "   AND ts.t BETWEEN t.timestamp - 0.05 AND t.timestamp + 0.05) AS front_ms "
+        "FROM telemetry t WHERE t.session_id = ? AND t.speed_ms > 5",
+        [session_id],
+    )
+
+    threshold_ms = slip_threshold_kmh / 3.6
+    wheelspin: list[dict[str, Any]] = []
+    lockup:    list[dict[str, Any]] = []
+    for r in rows:
+        if r["rear_ms"] is None or r["front_ms"] is None:
+            continue
+        rear_over_front = r["rear_ms"] - r["front_ms"]
+        body_minus_front = r["speed_ms"] - r["front_ms"]
+        # Wheelspin: rear leading front under throttle.
+        if (r["throttle_pct"] or 0) > 60 and rear_over_front > threshold_ms:
+            wheelspin.append({
+                "distance_m": round(r["distance_m"], 1),
+                "throttle_pct": round(r["throttle_pct"], 1),
+                "slip_kmh": round(rear_over_front * 3.6, 2),
+                "corner": _corner_for_distance(r["distance_m"], bounds),
+            })
+        # Lockup: body speed exceeds front wheels under brake.
+        if (r["brake_bar"] or 0) > 10 and body_minus_front > threshold_ms:
+            lockup.append({
+                "distance_m": round(r["distance_m"], 1),
+                "brake_bar": round(r["brake_bar"], 1),
+                "lock_kmh": round(body_minus_front * 3.6, 2),
+                "corner": _corner_for_distance(r["distance_m"], bounds),
+            })
+    return {
+        "session_id": session_id,
+        "wheelspin_events": wheelspin[:20],
+        "lockup_events":    lockup[:20],
+        "wheelspin_count":  len(wheelspin),
+        "lockup_count":     len(lockup),
+        "threshold_kmh":    slip_threshold_kmh,
+        "note": "Wheelspin = rear-avg > front-avg under throttle. "
+                "Lockup = body speed > front-avg under brake.",
+    }
+
+
+def _corner_for_distance(d: float | None,
+                         bounds: dict[str, tuple[float, float]]) -> str:
+    """Resolve a cumulative-distance reading to its corner via lap-modulo."""
+    if d is None:
+        return ""
+    lap_m = _track_length_m()
+    d_lap = d % lap_m if lap_m > 0 else d
+    for name, (lo, hi) in bounds.items():
+        if lo <= d_lap <= hi:
+            return name
+    return ""
+
+
+# ── 18. Input quality tool (steering/throttle/brake smoothness) ───────────────
+
+@_adk_tool
+def get_input_smoothness(session_id: str) -> dict[str, Any]:
+    """Coach the *quality* of inputs: how smoothly the driver applies them.
+
+    Three metrics derived from the wide-row table:
+      - steering oscillation (std-dev of frame-to-frame Δsteering_deg)
+      - throttle modulation rate (mean |Δthrottle| per sample)
+      - brake-release shape (median of Δbrake_bar over the trailing edge of
+        each brake event)
+
+    Lower oscillation and lower throttle Δ are smoother. The brake-release
+    metric is positive when releases taper (ideal) and large-negative when
+    the driver square-waves off the pedal.
+    """
+    rows = _q(
+        "SELECT steering_deg, throttle_pct, brake_bar "
+        "FROM telemetry WHERE session_id = ? ORDER BY frame_idx",
+        [session_id],
+    )
+    if not rows or len(rows) < 50:
+        return {"error": f"insufficient telemetry for session {session_id}"}
+    n = len(rows)
+    abs_steer_d = 0.0
+    abs_steer_n = 0
+    abs_throt_d = 0.0
+    abs_throt_n = 0
+    steer_sq_sum = 0.0
+    steer_count = 0
+    # Brake-release delta tracking: when brake_bar drops from > 5 toward 0.
+    release_deltas: list[float] = []
+    in_brake = False
+    last_brake_bar: float | None = None
+    for i in range(1, n):
+        s0, s1 = rows[i - 1]["steering_deg"], rows[i]["steering_deg"]
+        if s0 is not None and s1 is not None:
+            d = s1 - s0
+            abs_steer_d += abs(d); abs_steer_n += 1
+            steer_sq_sum += d * d; steer_count += 1
+        t0, t1 = rows[i - 1]["throttle_pct"], rows[i]["throttle_pct"]
+        if t0 is not None and t1 is not None:
+            abs_throt_d += abs(t1 - t0); abs_throt_n += 1
+        b1 = rows[i]["brake_bar"] or 0.0
+        b0 = rows[i - 1]["brake_bar"] or 0.0
+        if b0 > 5 and not in_brake:
+            in_brake = True
+            last_brake_bar = b0
+        elif in_brake and b1 < b0 and last_brake_bar is not None:
+            release_deltas.append(b1 - b0)   # negative
+            if b1 < 1:
+                in_brake = False
+                last_brake_bar = None
+
+    steer_oscillation = (steer_sq_sum / steer_count) ** 0.5 if steer_count else 0.0
+    throttle_jerk = abs_throt_d / abs_throt_n if abs_throt_n else 0.0
+    median_release = (sorted(release_deltas)[len(release_deltas) // 2]
+                      if release_deltas else 0.0)
+    smoothness_score = max(0, 100 - steer_oscillation * 3 - throttle_jerk * 2)
+    return {
+        "session_id": session_id,
+        "steering_oscillation_deg": round(steer_oscillation, 2),
+        "throttle_modulation_rate": round(throttle_jerk, 2),
+        "median_brake_release_delta_bar": round(median_release, 2),
+        "brake_release_events": len(release_deltas),
+        "smoothness_score_0_100": round(smoothness_score, 1),
+        "verdict": ("smooth"      if smoothness_score >= 75 else
+                    "competent"   if smoothness_score >= 55 else
+                    "choppy"),
+        "note": "Lower steering_oscillation = quieter wheel; "
+                "lower throttle_modulation_rate = less bang-bang; "
+                "median_brake_release_delta closer to -1 bar/frame = tapered (good); "
+                "large negative = square-wave release.",
+    }
+
+
+# ── 19. Safety events tool (AiM status flags + TPMS alarms) ───────────────────
+
+@_adk_tool
+def get_safety_events(session_id: str) -> dict[str, Any]:
+    """ABS/DSC/MIL faults and TPMS alarm timeline.
+
+    Surfaces edges where any of `abs_fail`, `dsc_reg`, `mil_chk_eng`, or
+    `tpms_alm_*` transitions to a non-zero value. Used to explain "what
+    actually changed" when pace drops mid-session.
+    """
+    edges: list[dict[str, Any]] = []
+    # Status flags — record the first sample where the signal goes non-zero.
+    for sig, kind in [
+        ("abs_fail",     "ABS unavailable"),
+        ("dsc_reg",      "DSC regulation event"),
+        ("mil_chk_eng",  "MIL fault flag"),
+        ("brake_switch", "brake-switch state"),
+    ]:
+        row = _q(
+            "SELECT MIN(ts.t) AS first_t, COUNT(*) AS n "
+            "FROM telemetry_signals ts "
+            "JOIN signal_registry sr ON sr.signal_id = ts.signal_id "
+            "WHERE ts.session_id = ? AND sr.name = ? AND ts.value > 0",
+            [session_id, sig],
+        )
+        if row and (row[0].get("n") or 0) > 0:
+            edges.append({
+                "kind":    kind,
+                "signal":  sig,
+                "first_t": row[0]["first_t"],
+                "count":   row[0]["n"],
+            })
+    # TPMS alarms (already surfaced by get_tire_thermal_window but echoed here
+    # so the safety agent can find them without two tools).
+    tpms = _q(
+        "SELECT sr.name AS name, COUNT(*) AS n, MIN(ts.t) AS first_t "
+        "FROM telemetry_signals ts "
+        "JOIN signal_registry sr ON sr.signal_id = ts.signal_id "
+        "WHERE ts.session_id = ? AND sr.name LIKE 'tpms_alm_%' AND ts.value > 0 "
+        "GROUP BY sr.name",
+        [session_id],
+    )
+    for r in tpms:
+        edges.append({
+            "kind":    f"TPMS alarm on {r['name'][-2:].upper()}",
+            "signal":  r["name"],
+            "first_t": r["first_t"],
+            "count":   r["n"],
+        })
+    edges.sort(key=lambda e: e.get("first_t") or 0)
+    return {
+        "session_id": session_id,
+        "events":     edges,
+        "event_count": len(edges),
+        "note": "Empty events list = the M3 ran clean — no DSC interventions, "
+                "no ABS fault, no MIL, no TPMS alarms during this session.",
+    }
+
+
+# ── 20. Agent telemetry query tool ────────────────────────────────────────────
 
 @_adk_tool
 def get_agent_telemetry(n_recent: int = 50) -> dict[str, Any]:
@@ -735,12 +1276,12 @@ def get_agent_telemetry(n_recent: int = 50) -> dict[str, Any]:
     Reads from agent_traces table (ADR-021). Use to answer meta questions like
     'which agent is slowest?' or 'what tools are called most often?'.
     """
-    if not os.path.exists(DB_PATH):
-        return {"error": "No database found"}
-
-    # Re-open via shared backend (DuckDB on Mac, SQLite on Termux)
+    # Re-open via shared backend (DuckDB on Mac, SQLite on Termux). Uses
+    # state.db_path so tests that rebind it see the right DB.
     from pitwall.db import get_db as _g
     conn = _g()
+    if conn is None:
+        return {"error": "No database found"}
     try:
         slowest = conn.execute(
             "SELECT agent_name, ROUND(AVG(latency_ms), 1) as avg_ms, COUNT(*) as runs "

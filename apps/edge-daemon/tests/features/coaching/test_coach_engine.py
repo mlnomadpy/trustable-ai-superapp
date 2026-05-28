@@ -345,23 +345,21 @@ def test_rule_coach_voices_marker_label(real_track, make_frame_fn):
 # ─── LitertCoach ─────────────────────────────────────────────────────────────
 
 
-def test_litert_coach_constructs_without_runtime(monkeypatch):
-    """When the runtime fails to load, construction must still succeed; the
-    coach exposes loaded=False and a non-empty error so callers can decide
-    how to fall back. We force the failure via monkeypatch so the test
-    works regardless of whether litert-lm + Gemma are installed locally."""
-    def _explode(self, _model_path):
-        raise RuntimeError("forced-no-runtime")
-    monkeypatch.setattr(LitertCoach, "_init_runtime", _explode)
-
+def test_litert_coach_constructs_cheaply():
+    """ADR-025: construction is HTTP-only. No engine probe, no model
+    resolution, no runtime load — so construction can't fail on a fresh
+    install. health() always reports the HTTP transport."""
     c = LitertCoach(driver_level="intermediate")
     h = c.health()
-    assert h["loaded"] is False
-    assert "forced-no-runtime" in h["error"]
+    assert h["transport"] == "http"
+    assert h["http_url"]
+    assert h["http_model"]
+    assert h["fallback"] == "rule"
 
 
 def test_litert_coach_propose_falls_back_to_rule():
-    """Without an LLM, propose should produce RuleCoach output."""
+    """propose() defers to RuleCoach per ADR-017 — LLM latency is wrong
+    for sub-corner cues regardless of transport."""
     c = LitertCoach(driver_level="intermediate")
     ctx = _ctx(meters_to_entry=120, next_corner_name="Turn 5",
                next_corner_direction="R", next_corner_severity=4,
@@ -371,12 +369,13 @@ def test_litert_coach_propose_falls_back_to_rule():
     assert msg is None or isinstance(msg, CoachingMessage)
 
 
-def test_litert_coach_brief_falls_back_to_templated(monkeypatch):
-    """Force-fail the runtime so brief() falls through to the templated
-    path. Independent of whether the LLM is installed locally."""
-    def _explode(self, _model_path):
-        raise RuntimeError("forced-no-runtime")
-    monkeypatch.setattr(LitertCoach, "_init_runtime", _explode)
+def test_litert_coach_brief_returns_empty_when_localllm_unreachable(monkeypatch):
+    """No-fake-data policy: when LocalLLM is unreachable, brief() returns
+    empty narrative + empty focus + neutral emotion. The PWA renders an
+    honest "brief unavailable" state from there."""
+    def _unreachable(self, _sys, _usr):
+        raise RuntimeError("localllm unreachable")
+    monkeypatch.setattr(LitertCoach, "_generate_http", _unreachable)
 
     c = LitertCoach(driver_level="intermediate")
     text, focus, emotion = c.brief(
@@ -384,17 +383,16 @@ def test_litert_coach_brief_falls_back_to_templated(monkeypatch):
         weather_phase="morning_fog", surface_state="cool damp",
         markers_selected=["Turn 11"],
     )
-    assert text  # templated brief
-    assert isinstance(focus, list)
-    assert emotion == "neutral"     # no LLM ⇒ neutral fallback
+    assert text == ""
+    assert focus == []
+    assert emotion == "neutral"
 
 
-def test_litert_coach_debrief_returns_empty_when_no_llm(monkeypatch):
-    """Force-empty engine ⇒ debrief returns ("", [], "neutral") so callers
-    fall through. Independent of whether the model is installed."""
-    def _explode(self, _model_path):
-        raise RuntimeError("forced-no-runtime")
-    monkeypatch.setattr(LitertCoach, "_init_runtime", _explode)
+def test_litert_coach_debrief_returns_empty_when_localllm_unreachable(monkeypatch):
+    """Same no-fake-data policy for debrief()."""
+    def _unreachable(self, _sys, _usr):
+        raise RuntimeError("localllm unreachable")
+    monkeypatch.setattr(LitertCoach, "_generate_http", _unreachable)
 
     c = LitertCoach(driver_level="intermediate")
     text, focus, emotion = c.debrief({"track": "Sonoma Raceway", "scorecard": {}})
@@ -406,13 +404,13 @@ def test_litert_coach_debrief_returns_empty_when_no_llm(monkeypatch):
 # ─── ADR-018: LLM friction sink ──────────────────────────────────────────────
 
 
-def test_friction_logger_called_when_llm_unloaded(monkeypatch):
-    """Even when the engine fails to load, brief()/debrief() must emit a
-    friction record so the bridge can see how often we're falling back."""
-    monkeypatch.setattr(
-        LitertCoach, "_init_runtime",
-        lambda self, _p: (_ for _ in ()).throw(RuntimeError("no model")),
-    )
+def test_friction_logger_called_when_localllm_unreachable(monkeypatch):
+    """When LocalLLM is unreachable, brief() / debrief() must each emit a
+    friction record so the bridge sees how often we're falling back."""
+    def _unreachable(self, _sys, _usr):
+        raise RuntimeError("localllm unreachable at http://localhost:8099/v1")
+    monkeypatch.setattr(LitertCoach, "_generate_http", _unreachable)
+
     captured: list[dict] = []
     coach_engine.set_friction_logger(captured.append)
     try:
@@ -437,27 +435,19 @@ def test_friction_logger_called_when_llm_unloaded(monkeypatch):
         assert rec["fell_back"] is True
         assert rec["session_id"] == "sonoma-001"
         assert rec["completion_chars"] == 0
-        assert rec["error"]                    # carries init error
+        assert "unreachable" in rec["error"]
         assert rec["prompt_chars"] > 0
 
 
 def test_friction_logger_records_successful_generate(monkeypatch):
-    """When _generate runs end-to-end (engine present), the friction record
-    captures latency, prompt length, completion length, and no fallback."""
-    monkeypatch.setattr(LitertCoach, "_init_runtime", lambda self, _p: None)
-    c = LitertCoach(driver_level="intermediate")
-    # Stand in a fake engine so _generate's `self._engine is None` guard passes.
-    class _FakeConv:
-        def send_message(self, _msg):
-            time.sleep(0.005)   # measurable latency
-            return {"role": "assistant",
-                    "content": [{"type": "text", "text": "[EMOTION: focused]\nbrake at the bridge."}]}
-    class _FakeEngine:
-        def create_conversation(self, **_kw):
-            return _FakeConv()
-    c._engine = _FakeEngine()
-    c._llm = c._engine
+    """When _generate_http returns text, the friction record captures
+    latency, prompt length, completion length, and no fallback."""
+    def _ok(self, _sys, _usr):
+        time.sleep(0.005)   # measurable latency
+        return "[EMOTION: focused]\nbrake at the bridge."
+    monkeypatch.setattr(LitertCoach, "_generate_http", _ok)
 
+    c = LitertCoach(driver_level="intermediate")
     captured: list[dict] = []
     coach_engine.set_friction_logger(captured.append)
     try:
@@ -478,19 +468,13 @@ def test_friction_logger_records_successful_generate(monkeypatch):
 
 
 def test_friction_logger_captures_exception_inside_generate(monkeypatch):
-    """If send_message raises, the record must mark fell_back + carry the error
-    so the operator can see why a coach turn produced no text."""
-    monkeypatch.setattr(LitertCoach, "_init_runtime", lambda self, _p: None)
-    c = LitertCoach(driver_level="intermediate")
-    class _BoomConv:
-        def send_message(self, _msg):
-            raise RuntimeError("boom")
-    class _BoomEngine:
-        def create_conversation(self, **_kw):
-            return _BoomConv()
-    c._engine = _BoomEngine()
-    c._llm = c._engine
+    """If the HTTP call raises, the record must mark fell_back + carry the
+    error so the operator can see why a coach turn produced no text."""
+    def _boom(self, _sys, _usr):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(LitertCoach, "_generate_http", _boom)
 
+    c = LitertCoach(driver_level="intermediate")
     captured: list[dict] = []
     coach_engine.set_friction_logger(captured.append)
     try:
@@ -626,9 +610,11 @@ def test_mid_corner_coasting_rule_gates_on_input_rate():
 
 def test_friction_logger_setter_swallows_errors(monkeypatch):
     """A misbehaving sink must NEVER bubble out of inference."""
-    monkeypatch.setattr(LitertCoach, "_init_runtime", lambda self, _p: None)
+    def _unreachable(self, _sys, _usr):
+        raise RuntimeError("localllm unreachable")
+    monkeypatch.setattr(LitertCoach, "_generate_http", _unreachable)
+
     c = LitertCoach(driver_level="intermediate")
-    c._engine = None       # force the unloaded path
 
     def _bad_logger(_rec):
         raise RuntimeError("sink crashed")
@@ -679,12 +665,15 @@ def test_extract_emotion_empty_input_returns_neutral():
     assert cleaned == ""
 
 
-def test_valid_emotions_set_has_12_entries():
+def test_valid_emotions_set_has_13_entries():
     from pitwall.features.coaching.coach_engine import VALID_EMOTIONS
-    assert len(VALID_EMOTIONS) == 12
+    # `focused` was added 2026-05-28 to align with the ADK system prompt
+    # which advertises {neutral, encouraging, focused, concerned, excited}.
+    assert len(VALID_EMOTIONS) == 13
     assert "neutral" in VALID_EMOTIONS
     assert "thinking" in VALID_EMOTIONS
     assert "proud" in VALID_EMOTIONS
+    assert "focused" in VALID_EMOTIONS
 
 
 def test_build_system_prompt_includes_emotion_instruction():
@@ -708,18 +697,12 @@ def test_make_coach_litert():
     assert c.name == "litert"
 
 
-def test_make_coach_tflite_alias():
-    c = make_coach("tflite")
-    assert c.name == "litert"
-
-
-def test_make_coach_auto_falls_back_to_rule(monkeypatch):
-    """Force-fail the runtime ⇒ make_coach('auto') picks RuleCoach."""
-    def _explode(self, _model_path):
-        raise RuntimeError("forced-no-runtime")
-    monkeypatch.setattr(LitertCoach, "_init_runtime", _explode)
+def test_make_coach_auto_returns_litert():
+    """ADR-025: construction is cheap (no engine probe), so make_coach('auto')
+    always returns LitertCoach. Transport health is observed at call time
+    via the friction sink, not at construction."""
     c = make_coach("auto")
-    assert c.name == "rule"
+    assert c.name == "litert"
 
 
 def test_make_coach_invalid_kind_raises():

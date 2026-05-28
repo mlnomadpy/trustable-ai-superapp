@@ -124,10 +124,12 @@ honest `{available: false}`.
 ## What this means for `docs/adk-agent-architecture.md`
 
 The 17-agent topology is implemented and the `agent_traces` table /
-`/coach/traces` endpoint are wired in `bp_coaching.py`. They're inert on
-the phone until ADK installs. They're fully functional on a desktop dev
-box running LocalLLM (or Ollama / LM Studio / vLLM via the `openai`
-backend selector).
+`/coach/traces` endpoint are wired in `bp_coaching.py`. Per
+[ADR-024](adr/024-localllm-sole-llm-transport.md), `google-adk` + `litellm`
+are now base deps of `apps/edge-daemon`; the bridge fails to start without
+them, so the "inert on the phone until ADK installs" branch is gone.
+Functionally identical against any OpenAI-compatible local server
+(LocalLLM on Pixel, or Ollama / LM Studio / vLLM on a dev box).
 
 ## What this means for `docs/coaching-engine.md`
 
