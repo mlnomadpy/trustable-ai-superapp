@@ -6,15 +6,15 @@
 
 ---
 
-This is a story about a kind of software that barely works yet: AI that has to act in the physical world, in real time, with a person depending on it at that exact second. Ours was a driving coach that talks in your ear while you take a corner at speed. It has to be right, it has to be instant, and — the part that breaks most designs — it has to run on the phone in your pocket, with no help from anywhere else.
+This is a story about a kind of software that barely works yet: AI that has to act in the physical world, in real time, with a person depending on it at that exact second. Ours was a driving coach that talks in your ear while you take a corner at speed. It has to be right, it has to be instant, and it has to run on the phone in your pocket, with no help from anywhere else, which is the part that breaks most designs.
 
-You cannot phone the cloud at 130 mph; a round trip at that speed is not a retry, it is a crash. So everything runs on the device, and the device is not generous. On-device models are slow, the accelerator that would speed them up is half-locked-down on shipping phones, and one wrong word in a driver's ear at the limit is worse than silence. Trustable, real-time, on-device AI is, honestly, an unsolved problem in 2026. We did not solve it. We took one slice — built on 535,000 frames of real driving across three tracks, shipped to a real car at a real track in a six-week sprint — and tried to make that slice trustworthy enough to put in a driver's ear at speed.
+You cannot phone the cloud at 130 mph; a round trip at that speed is not a retry, it is a crash. So everything runs on the device, and the device is not generous. On-device models are slow, the accelerator that would speed them up is half-locked-down on shipping phones, and one wrong word in a driver's ear at the limit is worse than silence. Trustable, real-time, on-device AI is, honestly, an unsolved problem in 2026. We did not solve it. We took one slice, built on 535,000 frames of real driving across three tracks, shipped to a real car at a real track in a six-week sprint, and tried to make that slice trustworthy enough to put in a driver's ear at speed.
 
 Which is where trust stops being abstract. We picked our guiding question because it scared us a little: when the AI you built helps put a race car into the wall at 130 mph, who do you `git blame`?
 
-It reads like a joke, and for a while it was our favorite one. Then you sit with it and notice the command is being completely literal. `git blame` always returns an answer, and the answer is never "a language model." It is a person. Someone reviewed that line. Someone merged it. Someone's name is on the commit. That question — half punchline, half spec — is the one that organized the entire sprint.
+It reads like a joke, and for a while it was our favorite one. Then you sit with it and notice the command is being completely literal. `git blame` always returns an answer, and the answer is never "a language model." It is a person. Someone reviewed that line. Someone merged it. Someone's name is on the commit. That question, half punchline, half spec, is the one that organized the entire sprint.
 
-Here is what the joke gets right. `git blame` is an ugly name for a generous thing: it does not assign fault, it hands you a name and a reason — this line exists because this person wrote it, and here is where they said why. On a healthy team the name it returns is not a culprit. It is the one human who understood this corner of the system well enough to change it, and who can still be asked about it. Authorship, not accusation.
+Here is what the joke gets right. `git blame` is an ugly name for a generous thing: it does not assign fault, it hands you a name and a reason: this line exists because this person wrote it, and here is where they said why. On a healthy team the name it returns is not a culprit. It is the one human who understood this corner of the system well enough to change it, and who can still be asked about it. Authorship, not accusation.
 
 That distinction is the whole essay. Building with AI does not remove human ownership of software. It concentrates it. An agent can draft the change, but a person reviews it, a person merges it, and a person's name goes on the commit.
 
@@ -35,18 +35,18 @@ Our goal was a single sentence: prove that an on-device AI racing coach can be t
 
 ## The people
 
-Fifteen people built this, give or take. How they were arranged mattered as much as how many they were, so the structure got a name: the F1 Garage Matrix. Three horizontal guilds built the shared platform — one owned the edge and the sensors, one the data pipeline, one the coaching and the pedagogy. Across them ran three vertical pods, one per driver skill level, five roles each, every pod tuning the shared platform for its own driver. The rule that kept it from sprawling was simple: build horizontal first, then vertical. The agents let a group this size move like a far larger one, but the arguments, the judgment, and the names on the commits stayed human.
+Fifteen people built this, give or take. How they were arranged mattered as much as how many they were, so the structure got a name: the F1 Garage Matrix. Three horizontal guilds built the shared platform: one owned the edge and the sensors, one the data pipeline, one the coaching and the pedagogy. Across them ran three vertical pods, one per driver skill level, five roles each, every pod tuning the shared platform for its own driver. The rule that kept it from sprawling was simple: build horizontal first, then vertical. The agents let a group this size move like a far larger one, but the arguments, the judgment, and the names on the commits stayed human.
 
 ```mermaid
 flowchart TB
-    subgraph G["Horizontal guilds — build the shared platform first"]
+    subgraph G["Horizontal guilds: build the shared platform first"]
         direction LR
         G1[Edge and sensors]
         G2[Data pipeline]
         G3[Coaching and pedagogy]
     end
     G -- "then tune for each driver" --> P
-    subgraph P["Vertical pods — one per driver level, five roles each"]
+    subgraph P["Vertical pods: one per driver level, five roles each"]
         direction LR
         P1[Novice]
         P2[Intermediate]
@@ -65,7 +65,7 @@ We inherited a lot, too. This repository consolidates work that already lived ac
 
 Remember him. In an essay about what agents can take off your plate, the one person they could not touch is the one standing closest to the metal, because that is exactly where this project has its hard floor, the part no model abstracted away.
 
-Getting telemetry off a 2003 race car is real engineering. A BMW E46 M3 does not expose a friendly port. An AiM dash logger sits in the middle, reads the car's bus, and re-broadcasts a fixed protocol — sixty-six channels on twenty frames — that an adapter forwards to the phone over USB-C. That is also a safety boundary we did not get to skip: the phone never touches the car's native bus, only the logger's clean copy of it, so nothing our software does can ever put noise back onto the wire that runs the engine. And that world is full of traps no clever prompt will save you from. The engine computer is supposed to report which gear you are in. It never does, so we compute gear from the ratio of engine speed to wheel speed. When we captured the live bus, roughly 38 percent of the frames on it were undocumented: in no spec anywhere, just showing up, needing to be recognized and ignored.
+Getting telemetry off a 2003 race car is real engineering. A BMW E46 M3 does not expose a friendly port. An AiM dash logger sits in the middle, reads the car's bus, and re-broadcasts a fixed protocol, sixty-six channels on twenty frames, that an adapter forwards to the phone over USB-C. That is also a safety boundary we did not get to skip: the phone never touches the car's native bus, only the logger's clean copy of it, so nothing our software does can ever put noise back onto the wire that runs the engine. And that world is full of traps no clever prompt will save you from. The engine computer is supposed to report which gear you are in. It never does, so we compute gear from the ratio of engine speed to wheel speed. When we captured the live bus, roughly 38 percent of the frames on it were undocumented: in no spec anywhere, just showing up, needing to be recognized and ignored.
 
 ```mermaid
 flowchart LR
@@ -86,15 +86,15 @@ People keep announcing the death of the project manager. That is overdramatic. W
 
 ## The machine
 
-The whole system lives on the phone for the reason we opened with: at the apex, there is no cloud to call. So the coach runs entirely on a Pixel 10, every piece of it — which is its own small story, because V1 of this rig was a laptop in the footwell plus a phone plus a tablet plus a dongle, and V2 collapsed all of it onto the single device in your hand. The car feeds a Python bridge running in Termux; the bridge calls a separate on-device model server; a render-only PWA shows the driver what the bridge decides. All of it is live at once, on the one phone, with the car running.
+The whole system lives on the phone for the reason we opened with: at the apex, there is no cloud to call. So the coach runs entirely on a Pixel 10, every piece of it, which is its own small story, because V1 of this rig was a laptop in the footwell plus a phone plus a tablet plus a dongle, and V2 collapsed all of it onto the single device in your hand. The car feeds a Python bridge running in Termux; the bridge calls a separate on-device model server; a render-only PWA shows the driver what the bridge decides. All of it is live at once, on the one phone, with the car running.
 
 ```mermaid
 flowchart LR
-    subgraph CAR["Car — BMW E46 M3"]
+    subgraph CAR["Car: BMW E46 M3"]
         AIM[AiM dash logger] --> CAN[CAN over USB-C]
     end
 
-    subgraph PHONE["Pixel 10 — everything on-device"]
+    subgraph PHONE["Pixel 10: everything on-device"]
         subgraph TERMUX["Termux · the bridge, Python"]
             READER[CAN reader + decoder]
             DB[(DuckDB<br/>session log)]
@@ -133,7 +133,7 @@ The most trustable decision we made was to not use the AI where it would fail. W
 
 ```mermaid
 flowchart LR
-    subgraph Corner["The corner — under 1 second"]
+    subgraph Corner["The corner: under 1 second"]
         direction LR
         T0[0.00s<br/>corner begins] --> T1[0.25s<br/>model's first word] --> T2[~1.0s<br/>corner is over]
     end
@@ -148,13 +148,13 @@ That solves the corner. The paddock, where the real coaching happens, raised a d
 
 ```mermaid
 flowchart TB
-    subgraph Before["Before — a model inside every agent"]
+    subgraph Before["Before: a model inside every agent"]
         direction LR
         b1[Agent] --> m1[(model)]
         b2[Agent] --> m2[(model)]
         b3[Agent ×23] --> m3[(model)]
     end
-    subgraph After["After — one local waiter for the whole fleet"]
+    subgraph After["After: one local waiter for the whole fleet"]
         direction LR
         all[All 23 agents] --> srv[(LocalLLM<br/>one OpenAI server<br/>127.0.0.1:8099<br/>own process · bearer token)]
     end
@@ -163,13 +163,13 @@ flowchart TB
 
 We gave the phone one good waiter instead, who takes every order in the same language. That is LocalLLM, a small open-source Android app. It hosts the on-device model in its own process and exposes it as an ordinary OpenAI-style server on a local port. It keeps the door locked with a bearer token so no other app can wander in, and it does the one thing a kitchen full of cooks never could: it owns the compute. It queues the orders instead of running them all at once, keeps a warm KV cache across calls so repeated context is not re-chewed every time, and manages memory and the chip itself. Three good things fall out of one server. Contention disappears, because there is one model in memory, not twenty-three, and the waiter, not the agents, decides who is served next, so no agent can starve another for compute. The boundary gets clean, because if the model crashes it crashes in its own app, and the bridge just reconnects. And because the interface is the OpenAI standard, the exact same code talks to the phone in the field and to a plain model server on a laptop while you build. We developed against the interface we shipped.
 
-One more rule keeps the fleet predictable: we never let the model decide which agent runs. A driver's question is routed by plain keyword matching, not by asking an LLM to classify intent — when a wrong turn means the wrong answer in someone's ear, predictability beats cleverness.
+One more rule keeps the fleet predictable: we never let the model decide which agent runs. A driver's question is routed by plain keyword matching, not by asking an LLM to classify intent. When a wrong turn means the wrong answer in someone's ear, predictability beats cleverness.
 
 ## Coaching in a real voice
 
 A coach can be fast, on-device, and perfectly architected and still be useless if it talks like a manual. The hard part was never the plumbing. It was getting the thing to say what a good coach would say, in the words a real one uses. That came from two people: Ross Bentley, through his *Speed Secrets* curriculum, and a coach we will call T-Rod, through one afternoon at Sonoma.
 
-Bentley gave us the theory, and we refused to just hand the model a PDF. Each concept in the curriculum became a small structured object the system could act on: the telemetry condition that should trigger it, the physics underneath, the exact words to say at each skill level, the anti-pattern that means the driver is overcooking it, and a reference number from a fast lap to measure against. Trail braking, for instance, fires when the brake is still on past turn-in and the car is already loading sideways. Its object carries the physics — trailing the brake keeps weight on the front tires, which buys the grip to rotate — three phrasings, the mistake to watch for, and the pressure a quick driver holds at the apex.
+Bentley gave us the theory, and we refused to just hand the model a PDF. Each concept in the curriculum became a small structured object the system could act on: the telemetry condition that should trigger it, the physics underneath, the exact words to say at each skill level, the anti-pattern that means the driver is overcooking it, and a reference number from a fast lap to measure against. Trail braking, for instance, fires when the brake is still on past turn-in and the car is already loading sideways. Its object carries the physics (trailing the brake keeps weight on the front tires, which buys the grip to rotate), three phrasings, the mistake to watch for, and the pressure a quick driver holds at the apex.
 
 ```mermaid
 flowchart TB
@@ -182,13 +182,13 @@ flowchart TB
     COMPOSE --> SAY[Coach speaks the pace note]
 ```
 
-T-Rod gave us the voice. We recorded a full session of him coaching an intermediate driver in an M3 around Sonoma and kept every word, then went through it corner by corner and lifted the lines only someone who has driven the place would produce. He does not say "increase throttle application"; he says "just go 100, the torque difference is only about 20 ft-lbs, that's not a lot." He says "distance is king" through the long sweepers, "be closer to the tire stacks" at eleven, "trust the curb, it catches you" where the berm is banked in your favor. That last line gave this essay its title, and you cannot generate it — you have to go get it from someone who has driven the corner. None of it was paraphrased. The phrases went into the Sonoma prompt verbatim, labeled as the coach's own voice.
+T-Rod gave us the voice. We recorded a full session of him coaching an intermediate driver in an M3 around Sonoma and kept every word, then went through it corner by corner and lifted the lines only someone who has driven the place would produce. He does not say "increase throttle application"; he says "just go 100, the torque difference is only about 20 ft-lbs, that's not a lot." He says "distance is king" through the long sweepers, "be closer to the tire stacks" at eleven, "trust the curb, it catches you" where the berm is banked in your favor. That last line gave this essay its title, and you cannot generate it. You have to go get it from someone who has driven the corner. None of it was paraphrased. The phrases went into the Sonoma prompt verbatim, labeled as the coach's own voice.
 
-The same concept comes out differently depending on who is in the seat. A beginner hears a whole sentence: "keep some brake on as you turn in, it helps the car rotate." An intermediate gets shorthand: "trail to the apex, smooth release." A quick driver gets the terse version with a number to chase: "trail to apex, fifteen percent, that's where the reference holds it." The pace notes compress the same way, from "Turn 2 in 185 meters, brake at the bridge" down to "T11, two-thirty, the bump." Even the definition of a mistake is set for this audience: a pedal counts as on at five percent throttle or one bar of brake — the thresholds of a quick road driver, not the ninety-five percent and five bar an F1 rig would use, which would write off almost everything a track-day driver does as coasting.
+The same concept comes out differently depending on who is in the seat. A beginner hears a whole sentence: "keep some brake on as you turn in, it helps the car rotate." An intermediate gets shorthand: "trail to the apex, smooth release." A quick driver gets the terse version with a number to chase: "trail to apex, fifteen percent, that's where the reference holds it." The pace notes compress the same way, from "Turn 2 in 185 meters, brake at the bridge" down to "T11, two-thirty, the bump." Even the definition of a mistake is set for this audience: a pedal counts as on at five percent throttle or one bar of brake, the thresholds of a quick road driver, not the ninety-five percent and five bar an F1 rig would use, which would write off almost everything a track-day driver does as coasting.
 
 And the coach speaks in places, not coordinates. Sixteen landmarks across the track, each hand-named from how real drivers actually call the corners. It does not say "brake in 124 meters." It says "brake at the bridge," or "the bump where the road widens," or "the third tire stack." On a full replay, 42 percent of the pace notes per lap name a real landmark.
 
-And it knows where to dig. The biggest pool of lap time for most drivers is not some heroic corner; it is doing nothing. On our data, 6.3 percent of every lap — about six seconds — is spent coasting, neither braking nor on the throttle, and that idle time is the coach's number-one target. The single richest place to spend it is Turn 10: the fastest point on the track, feeding the hardest stop on the lap, a hundred-and-twenty-four-meter brake zone peaking at forty-seven bar. A tenth found there outweighs a tidy lap everywhere else.
+And it knows where to dig. The biggest pool of lap time for most drivers is not some heroic corner; it is doing nothing. On our data, 6.3 percent of every lap, about six seconds, is spent coasting, neither braking nor on the throttle, and that idle time is the coach's number-one target. The single richest place to spend it is Turn 10: the fastest point on the track, feeding the hardest stop on the lap, a hundred-and-twenty-four-meter brake zone peaking at forty-seven bar. A tenth found there outweighs a tidy lap everywhere else.
 
 None of this is retrieval magic. At each moment the system reads the telemetry, picks the single concept that fits right now, and assembles the prompt by hand: the Bentley philosophy, the instruction for this driver's level, the Sonoma lore with its markers and T-Rod's lines, the live numbers, and the named braking point. Then one instruction: speak the pace note now. The model's job is deliberately narrow. The intelligence lives in the curriculum and the transcript; the model only has to turn it into a sentence.
 
@@ -216,7 +216,7 @@ flowchart TB
     SF --> FILT
     FILT --> OK{Verified against real data?}
     OK -- yes --> SAY[Narrator speaks the real number]
-    OK -- no --> UN["Says 'unavailable' — never invents"]
+    OK -- no --> UN["Says 'unavailable', never invents"]
 ```
 
 This is exactly where the 4,519-bar story pays off: the tool that quotes brake pressure filters the bad reading before it ever reaches a sentence, so the driver hears 90.8 bar, the real number. Three habits keep the rest honest. The pedagogical vectors ship with their own test cases, and a vector that fails its tests is disabled, not deployed, so a curriculum change cannot silently break the coaching. A friction log records every coaching call, so we can watch the model start to drift before it bites mid-session. And when the model genuinely cannot answer, because it is offline or timed out or the output will not parse, the system does not improvise. It says "unavailable." A no-fake-data policy is not a promise that a model never hallucinates inside a sentence. Nobody can promise that yet. It is a contract about the edges, which is exactly where most systems quietly start lying.
@@ -227,7 +227,7 @@ I have spent this whole essay telling you the agents were a gift. They were. Her
 
 Start with the engine under the engine. We ran local Gemma models, Gemma 3 and Gemma 4, and we tried two ways to get them onto the phone. Android's AICore, still in beta, would only run on a Pixel 10 Pro; on the plain Pixel 10 we hit access restrictions and could not use it at all. LiteRT-LM ran everywhere, but it could not load the model onto the Tensor G5, the phone's own NPU, so we were left on the CPU. On the CPU, inference came in around 20 tokens a second. That is fine for a paragraph you read at your leisure and a non-starter for anything that has to keep pace with a car. It is the real reason the model is banned from the corner, and the reason the whole three-tier design has to exist. We are betting that path opens up, and the day the model finally runs on the G5, the coach gets faster for free. But today, on the CPU, twenty tokens a second is the ceiling we built under.
 
-Then there is what the coding agents themselves could and could not do — Antigravity, Claude, Codex, the ones writing the software alongside us. They are extraordinary at work you can describe in text and check in text. They come apart the moment the task requires *seeing*. Give an agent a bug it can only judge by looking at a running app and it enters a loop: change something, launch, screenshot, squint, change something else, launch again. A human who is even slightly good centers a div in five seconds. We watched an agent spend ten minutes circling the same one, producing confident commits that moved it nowhere. The loop has a cost floor, and on small visual fixes the economics simply invert: the tool ends up slower and more expensive than the person it was meant to free.
+Then there is what the coding agents themselves could and could not do: Antigravity, Claude, Codex, the ones writing the software alongside us. They are extraordinary at work you can describe in text and check in text. They come apart the moment the task requires *seeing*. Give an agent a bug it can only judge by looking at a running app and it enters a loop: change something, launch, screenshot, squint, change something else, launch again. A human who is even slightly good centers a div in five seconds. We watched an agent spend ten minutes circling the same one, producing confident commits that moved it nowhere. The loop has a cost floor, and on small visual fixes the economics simply invert: the tool ends up slower and more expensive than the person it was meant to free.
 
 Phone UI is where this bit hardest. CSS that looked flawless in a desktop browser came apart on the actual Pixel: buttons shoved past the edge of the screen, fonts shrunk to nothing, components stacked on top of one another. Every screen of the PWA wanted its own hand-tuning for the device's real dimensions, and the agents do not understand physical screens yet. "Look at the screenshot and fix it" is not there; the model can narrate exactly what is wrong and still not drag the button back into frame. So you tune it yourself, screen by screen, the unglamorous way. The toolchain lied too: Android command-line tools that reported success while doing nothing, so even "it worked" could not be trusted until we saw the result on the car.
 
@@ -240,10 +240,10 @@ flowchart LR
     B -- no --> MOCK[Canned mock data<br/>that looks just like it]
     REAL --> OK[Screen lights up green]
     MOCK --> OK
-    OK --> LIE[Looks alive either way —<br/>even when nothing is connected]
+    OK --> LIE[Looks alive either way,<br/>even when nothing is connected]
 ```
 
-Every hop down that chain makes a broken system look healthier than it is. Our own audit found the symptom in plain language: hardcoded mock data on nearly every page, telemetry values pinned to zero, lap deltas typed in by hand. The fix has two halves. One is an instruction you have to repeat every single time — no fallbacks, no mock data; if you cannot reach the real thing, fail loudly — the same contract the coach lives by when it says "unavailable" instead of inventing a number. The other is structural: we started forcing real unit tests, written by us and run against the live code path, so a model that quietly swaps in a stub to turn the screen green trips a check it cannot author its way around. That is what finally caught the cheating.
+Every hop down that chain makes a broken system look healthier than it is. Our own audit found the symptom in plain language: hardcoded mock data on nearly every page, telemetry values pinned to zero, lap deltas typed in by hand. The fix has two halves. One is an instruction you have to repeat every single time: no fallbacks, no mock data; if you cannot reach the real thing, fail loudly. It is the same contract the coach lives by when it says "unavailable" instead of inventing a number. The other is structural: we started forcing real unit tests, written by us and run against the live code path, so a model that quietly swaps in a stub to turn the screen green trips a check it cannot author its way around. That is what finally caught the cheating.
 
 A few smaller traps, for the record. Agents hallucinate APIs with total confidence: one audit caught every call into our agent system invoking a `.run()` method that does not exist, code that would have thrown on the first request, written as though it were obviously right. They will write tests that pass by asserting the bug, the green-checkmark cousin of mock data. And on a long enough session they forget their own decisions, re-introduce code you deleted an hour ago, and quietly undo their own fixes.
 
@@ -253,11 +253,11 @@ None of this is an argument against the tools. It is the essay's own argument, s
 
 Speed has a tax. When agents let you write code this fast, you plant bombs this fast too, and a few of ours were live rounds. None went off at Sonoma, and the reason is worth saying plainly: not the tools, but the human review layer around them.
 
-A second-pass audit of the bridge found one lock — the plain, non-reentrant kind — taken in forty-two different places. Any single refactor that let a lock-holder call another locked path would have deadlocked the whole system in silence: no error, no log, just a car running and a coach gone quiet. For a while we also shipped with no clean-shutdown handler at all, so every stop was a hard kill and the database taught itself to corrupt on the way down; the recovery code we bolted on masks that, it does not cure it. There was an unbounded memory leak in the question-and-answer history, growing each time a client dropped without saying goodbye. And a wake-lock call that returned success and did absolutely nothing, because the companion app it needed was not installed — the toolchain lying with a straight face.
+A second-pass audit of the bridge found one lock, the plain non-reentrant kind, taken in forty-two different places. Any single refactor that let a lock-holder call another locked path would have deadlocked the whole system in silence: no error, no log, just a car running and a coach gone quiet. For a while we also shipped with no clean-shutdown handler at all, so every stop was a hard kill and the database taught itself to corrupt on the way down; the recovery code we bolted on masks that, it does not cure it. There was an unbounded memory leak in the question-and-answer history, growing each time a client dropped without saying goodbye. And a wake-lock call that returned success and did absolutely nothing, because the companion app it needed was not installed: the toolchain lying with a straight face.
 
-Then there was the over-engineering, which is a bomb of its own. We built a model backend that could switch between three transports, defensively, in case we ever needed them. We never did. The field data showed exactly one path was ever used; the other two were untested branches quietly rotting behind a flag. A later decision record named it for what it was — a single-path system wearing a three-path coat — and we deleted it. Same lesson the fallbacks taught: commit to the path you actually take, and do not let the code pretend to choices you will never make.
+Then there was the over-engineering, which is a bomb of its own. We built a model backend that could switch between three transports, defensively, in case we ever needed them. We never did. The field data showed exactly one path was ever used; the other two were untested branches quietly rotting behind a flag. A later decision record named it for what it was, a single-path system wearing a three-path coat, and we deleted it. Same lesson the fallbacks taught: commit to the path you actually take, and do not let the code pretend to choices you will never make.
 
-What caught all of this was not cleverness. It was discipline. Decision records that forced us to write down why. Second audits that read the code adversarially instead of admiringly. And real tests — three hundred and fifty-eight of them, including one fifty-one-assertion smoke test that runs the whole pipeline over a real eight-thousand-frame lap. Agents raise the rate at which bombs get planted; the only thing that keeps pace is a review layer that assumes the code is lying until it proves otherwise.
+What caught all of this was not cleverness. It was discipline. Decision records that forced us to write down why. Second audits that read the code adversarially instead of admiringly. And real tests: three hundred and fifty-eight of them, including one fifty-one-assertion smoke test that runs the whole pipeline over a real eight-thousand-frame lap. Agents raise the rate at which bombs get planted; the only thing that keeps pace is a review layer that assumes the code is lying until it proves otherwise.
 
 ## What is still hard
 
@@ -280,12 +280,10 @@ When a system that talks to a driver at speed gets something wrong, "the AI did 
 
 "Trust the curb" is what you tell a driver who is scared to put a wheel on the kerb. The edge will hold you, but only if you commit to it. It turned out to be the right instruction for the build, too. Trust the curb: commit to the hard edges you cannot fake, the on-device constraint, the latency budget, the stubborn old hardware. Trust the commit: put your name on the work and stand behind it. That name is not there to take the fall. It is there so that six months from now, when someone runs `git blame` on a strange line and asks why it is the way it is, there is a person to ask, and that person is glad to answer. Ownership, not blame. Pride, not fear.
 
-We proved one lap of the thesis. The rest is open road, and some of it is already mapped. The clearest next move is to lift the Termux backend off the phone and onto a small computer that rides in the car — a Raspberry Pi — so the bridge and the dashboard run as a proper server instead of squatting inside a handset. Then any device on the network can open the PWA: a laptop in the paddock, an engineer's tablet, a second phone, all watching the same live session and talking to the same dashboard. The phone stops being the whole system and settles into the two roles only it can play — the on-device LLM provider and one more screen. One box reads the car and serves everyone; the phone does what the phone is best at.
+We proved one lap of the thesis. The rest is open road, and some of it is already mapped. The clearest next move is to lift the Termux backend off the phone and onto a small computer that rides in the car, a Raspberry Pi, so the bridge and the dashboard run as a proper server instead of squatting inside a handset. Then any device on the network can open the PWA: a laptop in the paddock, an engineer's tablet, a second phone, all watching the same live session and talking to the same dashboard. The phone stops being the whole system and settles into the two roles only it can play: the on-device LLM provider and one more screen. One box reads the car and serves everyone; the phone does what the phone is best at.
 
 The open road needs builders of the organized kind: the ones who read the spec, respect the hardware, write down what they decided, and sign their name to it. The new era of building did not end human responsibility. It made it the most valuable thing you bring. If that sounds like you, the door is open.
 
-And one blunt note to end on. In the age of AI, yapping has no place. Talk has never been cheaper — a model will hand you infinite confident words for free — so the only scarce thing left is people who can actually build. Learn to build, not to yap. Only the commit counts. The rest is noise.
-
-And one blunt note to end on. In the age of AI, yapping has no place. Talk has never been cheaper — a model will hand you infinite confident words for free — so the only scarce thing left is people who can actually build. Learn to build, not to yap. Only the commit counts. The rest is noise.
+And one blunt note to end on. In the age of AI, yapping has no place. Talk has never been cheaper (a model will hand you infinite confident words for free), so the only scarce thing left is people who can actually build. Learn to build, not to yap. Only the commit counts. The rest is noise.
 
 *Taha Bouhsine, on behalf of the Pitwall team.*
