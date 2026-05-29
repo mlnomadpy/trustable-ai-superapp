@@ -1,7 +1,7 @@
 name: Deploy docs to GitHub Pages
 
 # Builds the mkdocs-material site from `docs/` + `mkdocs.yml` and deploys
-# it to GitHub Pages on every push to master. Also runnable on demand.
+# it to GitHub Pages on every push to the default branch. Also runnable on demand.
 #
 # One-time setup required in the repo's Settings → Pages:
 #   Build and deployment → Source: "GitHub Actions"
@@ -9,7 +9,7 @@ name: Deploy docs to GitHub Pages
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
     paths:
       - 'docs/**'
       - 'mkdocs.yml'

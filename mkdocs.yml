@@ -51,6 +51,8 @@ extra_javascript:
 
 nav:
   - Home: index.md
+  - Essays:
+      - "Trust the Curb, Trust the Commit": essays/trusted-at-130mph.md
   - Built with Google: stack.md
   - Architecture: architecture.md
   - Internal Architecture: internal_architecture.md
