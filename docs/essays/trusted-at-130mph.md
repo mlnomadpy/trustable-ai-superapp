@@ -282,4 +282,6 @@ When a system that talks to a driver at speed gets something wrong, "the AI did 
 
 We proved one lap of the thesis. The rest is open road, and it needs builders of the organized kind: the ones who read the spec, respect the hardware, write down what they decided, and sign their name to it. The new era of building did not end human responsibility. It made it the most valuable thing you bring. If that sounds like you, the door is open.
 
+And one blunt note to end on. In the age of AI, yapping has no place. Talk has never been cheaper — a model will hand you infinite confident words for free — so the only scarce thing left is people who can actually build. Learn to build, not to yap. Only the commit counts. The rest is noise.
+
 *Taha Bouhsine, on behalf of the Pitwall team.*
