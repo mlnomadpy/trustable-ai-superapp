@@ -1,9 +1,9 @@
 site_name: Pitwall Sprint — Trustable AI Racing Coach
-site_url: https://www.tahabouhsine.com/pitwall/
+site_url: https://www.tahabouhsine.com/trustable-ai-superapp/
 site_description: Real-time on-device AI coaching for Sonoma Raceway — built with Antigravity, Gemini CLI, Android Studio, Jetpack Compose, Google ADK, and Gemma 4 via LiteRT-LM.
-repo_url: https://github.com/mlnomadpy/pitwall
-repo_name: mlnomadpy/pitwall
-edit_uri: edit/master/docs/
+repo_url: https://github.com/mlnomadpy/trustable-ai-superapp
+repo_name: mlnomadpy/trustable-ai-superapp
+edit_uri: edit/main/docs/
 
 theme:
   name: material
