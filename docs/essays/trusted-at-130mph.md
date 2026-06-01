@@ -272,7 +272,7 @@ season of decisions we could only confirm in the final hour.
 !!! warning "The frontend still needs a pass"
 The driver-facing app was fully designed, and at the track we started wiring it to the
 live backend for real, screen by screen. Most screens still had mock or partial data
-when we arrived. Track Walk, Pre-Brief, the HUD, Pit Stall — we swapped stubs for
+when we arrived. Track Walk, Pre-Brief, the HUD, Pit Stall: we swapped stubs for
 live `/session/...` calls and SSE as the bridge came up, not in one flip. By evening
 the flows that mattered for the session read real data; the rest stayed honest about
 what was not wired yet. The data flows now. What is left is the UX: some screens still
@@ -315,4 +315,4 @@ The open road needs builders of the organized kind: the ones who read the spec, 
 
 And one blunt note to end on. In the age of AI, yapping has no place. Talk has never been cheaper (a model will hand you infinite confident words for free), so the only scarce thing left is people who can actually build. Learn to build, not to yap. Only the commit counts. The rest is noise.
 
-_Taha Bouhsine, with Aileen Villanueva (pitwall / frontend), on behalf of the Pitwall team._
+_Taha Bouhsine on behalf of the Pitwall team._
