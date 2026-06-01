@@ -2,7 +2,7 @@
 
 ### Trustable AI and vibe-coding, from "works on my machine" to real-time trust at speed.
 
-*A field note from the Trustable AI Racing Coach sprint. Written by Taha Bouhsine, with Aileen Villanueva (pitwall / frontend), on behalf of the Pitwall team.*
+*A field note from the Trustable AI Racing Coach sprint. Written by Taha Bouhsine on behalf of the Pitwall team.*
 
 ---
 
@@ -315,4 +315,4 @@ The open road needs builders of the organized kind: the ones who read the spec, 
 
 And one blunt note to end on. In the age of AI, yapping has no place. Talk has never been cheaper (a model will hand you infinite confident words for free), so the only scarce thing left is people who can actually build. Learn to build, not to yap. Only the commit counts. The rest is noise.
 
-*Taha Bouhsine, with Aileen Villanueva (pitwall / frontend), on behalf of the Pitwall team.*
+*Taha Bouhsine, on behalf of the Pitwall team.*
