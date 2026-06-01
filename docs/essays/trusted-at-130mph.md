@@ -271,10 +271,39 @@ Two honest gaps remain, and glossing them would be its own kind of mock data.
 
 !!! warning "The frontend still needs a pass"
     The driver-facing app was fully designed, and at the track we started wiring it to the
-    live backend for real, screen by screen. The data flows now. What is left is the UX:
-    some screens still need work before what the driver sees is as trustworthy as the
-    numbers behind it. A pretty screen over shaky data is worse than no screen, so this is
-    the part we will not rush.
+    live backend for real, screen by screen. Most screens still had mock or partial data
+    when we arrived. Track Walk, Pre-Brief, the HUD, Pit Stall: we swapped stubs for
+    live `/session/...` calls and SSE as the bridge came up, not in one flip. By evening
+    the flows that mattered for the session read real data; the rest stayed honest about
+    what was not wired yet. The data flows now. What is left is the UX: some screens still
+    need work before what the driver sees is as trustworthy as the numbers behind it. A
+    pretty screen over shaky data is worse than no screen, so this is the part we will not
+    rush.
+
+!!! quote "From the pitwall — Aileen Villanueva"
+    I want to be honest about what "trust the commit" actually looked like. Taha did the
+    heavy lifting on the architecture. I was constantly checking in with him to make sure
+    we were on the right track, and he was always available. I wasn't part of the early
+    bridge tests; I had the meetings and the screen map, but the actual car-side
+    constraints didn't hit me until Brian got the data layer working. The pitwall is where
+    we truly became a team.
+
+    That day, parts of the app were still mock data when we arrived. We weren't trying to
+    hide it, we knew, but mock green screens are just how you ship when you're racing
+    against a deadline. We replaced them piece by piece with live API data as the bridge
+    stabilized: corner grades on Track Walk, cues over SSE, friction on the diagnostic
+    bar, and the HUD layout on a real Pixel ([#34](https://github.com/mlnomadpy/pitwall/pull/34),
+    [#35](https://github.com/mlnomadpy/pitwall/pull/35)). Not every single screen got
+    finished, but the ones that mattered for the session had to stop lying first.
+
+    I had already been in that position once before the actual Sonoma race. We needed to
+    run an in-car test, so I had to merge an APK ([#25](https://github.com/mlnomadpy/pitwall/pull/25))
+    because a teammate was heading down to the garage to test it that day. I didn't even
+    have a Pixel on my desk to verify the build, but I merged it anyway because the
+    alternative was blocking their run. Sonoma was where that habit met reality: either
+    the UI matched the bridge, or we showed an empty screen and moved on. It's the same
+    contract as a coach telling a driver "unavailable," just on a different layer: glass,
+    not voice.
 
 When a system that talks to a driver at speed gets something wrong, "the AI did it" cannot be the answer. The answer has to be a name: on a commit, behind a pull request, attached to a decision someone wrote down and can defend. That is the thread through all of it. We used agents heavily and gratefully; they let a team of fifteen move like a much larger one. But we put the ownership back in by hand, at every layer. Commits authored by humans. A real review and a real test matrix instead of "it worked on my machine." Decisions written down with their reasons. A coach that says "I don't know" instead of making something up.
 
