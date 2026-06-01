@@ -2,7 +2,7 @@
 
 ### Trustable AI and vibe-coding, from "works on my machine" to real-time trust at speed.
 
-_A field note from the Trustable AI Racing Coach sprint. Written by Taha Bouhsine on behalf of the Pitwall team._
+*A field note from the Trustable AI Racing Coach sprint. Written by Taha Bouhsine, with Aileen Villanueva (pitwall / frontend), on behalf of the Pitwall team.*
 
 ---
 
@@ -57,11 +57,11 @@ flowchart TB
 We inherited a lot, too. This repository consolidates work that already lived across a handful of open-source projects, built by people whose names are in the commit history and the acknowledgments. You do not prototype at 130 mph from a blank page. You get there standing on other people's late nights.
 
 !!! quote "From the project acknowledgments"
-The single thing without which **none** of this exists: **Brian Luc** designed
-the in-car data system that gets telemetry off the car in the first place. The
-AiM MXP / CAN-over-USB-C pipeline every downstream component consumes, all of it
-ultimately reads data that exists in software only because of Brian's
-architecture. Thank you, Brian.
+    The single thing without which **none** of this exists: **Brian Luc** designed
+    the in-car data system that gets telemetry off the car in the first place. The
+    AiM MXP / CAN-over-USB-C pipeline every downstream component consumes, all of it
+    ultimately reads data that exists in software only because of Brian's
+    architecture. Thank you, Brian.
 
 Remember him. In an essay about what agents can take off your plate, the one person they could not touch is the one standing closest to the metal, because that is exactly where this project has its hard floor, the part no model abstracted away.
 
@@ -123,11 +123,11 @@ flowchart LR
 
 The only honest way to do that is to admit coaching is not one thing at one speed. It is three things at three speeds.
 
-| Tier           | What runs                              | Budget                    | When                 |
-| -------------- | -------------------------------------- | ------------------------- | -------------------- |
-| 🔴 **Hot**     | rule-based canonical phrases, no model | under 100 ms, every frame | on track, mid-corner |
-| 🟡 **Warm**    | brief and debrief over the local model | a few seconds             | parked               |
-| 🟢 **Paddock** | the agent system over the local model  | seconds                   | parked               |
+| Tier | What runs | Budget | When |
+|------|-----------|--------|------|
+| 🔴 **Hot** | rule-based canonical phrases, no model | under 100 ms, every frame | on track, mid-corner |
+| 🟡 **Warm** | brief and debrief over the local model | a few seconds | parked |
+| 🟢 **Paddock** | the agent system over the local model | seconds | parked |
 
 The most trustable decision we made was to not use the AI where it would fail. We measured it. On a developer machine, the on-device model takes about a quarter second to its first word and several seconds for a full thought; a pre-session brief clocked in at 6.7 seconds. The corner, meanwhile, is over in under a second.
 
@@ -167,7 +167,7 @@ One more rule keeps the fleet predictable: we never let the model decide which a
 
 ## Coaching in a real voice
 
-A coach can be fast, on-device, and perfectly architected and still be useless if it talks like a manual. The hard part was never the plumbing. It was getting the thing to say what a good coach would say, in the words a real one uses. That came from two people: Ross Bentley, through his _Speed Secrets_ curriculum, and a coach we will call T-Rod, through one afternoon at Sonoma.
+A coach can be fast, on-device, and perfectly architected and still be useless if it talks like a manual. The hard part was never the plumbing. It was getting the thing to say what a good coach would say, in the words a real one uses. That came from two people: Ross Bentley, through his *Speed Secrets* curriculum, and a coach we will call T-Rod, through one afternoon at Sonoma.
 
 Bentley gave us the theory, and we refused to just hand the model a PDF. Each concept in the curriculum became a small structured object the system could act on: the telemetry condition that should trigger it, the physics underneath, the exact words to say at each skill level, the anti-pattern that means the driver is overcooking it, and a reference number from a fast lap to measure against. Trail braking, for instance, fires when the brake is still on past turn-in and the car is already loading sideways. Its object carries the physics (trailing the brake keeps weight on the front tires, which buys the grip to rotate), three phrasings, the mistake to watch for, and the pressure a quick driver holds at the apex.
 
@@ -227,7 +227,7 @@ I have spent this whole essay telling you the agents were a gift. They were. Her
 
 Start with the engine under the engine. We ran local Gemma models, Gemma 3 and Gemma 4, and we tried two ways to get them onto the phone. Android's AICore, still in beta, would only run on a Pixel 10 Pro; on the plain Pixel 10 we hit access restrictions and could not use it at all. LiteRT-LM ran everywhere, but it could not load the model onto the Tensor G5, the phone's own NPU, so we were left on the CPU. On the CPU, inference came in around 20 tokens a second. That is fine for a paragraph you read at your leisure and a non-starter for anything that has to keep pace with a car. It is the real reason the model is banned from the corner, and the reason the whole three-tier design has to exist. We are betting that path opens up, and the day the model finally runs on the G5, the coach gets faster for free. But today, on the CPU, twenty tokens a second is the ceiling we built under.
 
-Then there is what the coding agents themselves could and could not do: Antigravity, Claude, Codex, the ones writing the software alongside us. They are extraordinary at work you can describe in text and check in text. They come apart the moment the task requires _seeing_. Give an agent a bug it can only judge by looking at a running app and it enters a loop: change something, launch, screenshot, squint, change something else, launch again. A human who is even slightly good centers a div in five seconds. We watched an agent spend ten minutes circling the same one, producing confident commits that moved it nowhere. The loop has a cost floor, and on small visual fixes the economics simply invert: the tool ends up slower and more expensive than the person it was meant to free.
+Then there is what the coding agents themselves could and could not do: Antigravity, Claude, Codex, the ones writing the software alongside us. They are extraordinary at work you can describe in text and check in text. They come apart the moment the task requires *seeing*. Give an agent a bug it can only judge by looking at a running app and it enters a loop: change something, launch, screenshot, squint, change something else, launch again. A human who is even slightly good centers a div in five seconds. We watched an agent spend ten minutes circling the same one, producing confident commits that moved it nowhere. The loop has a cost floor, and on small visual fixes the economics simply invert: the tool ends up slower and more expensive than the person it was meant to free.
 
 Phone UI is where this bit hardest. CSS that looked flawless in a desktop browser came apart on the actual Pixel: buttons shoved past the edge of the screen, fonts shrunk to nothing, components stacked on top of one another. Every screen of the PWA wanted its own hand-tuning for the device's real dimensions, and the agents do not understand physical screens yet. "Look at the screenshot and fix it" is not there; the model can narrate exactly what is wrong and still not drag the button back into frame. So you tune it yourself, screen by screen, the unglamorous way. The toolchain lied too: Android command-line tools that reported success while doing nothing, so even "it worked" could not be trusted until we saw the result on the car.
 
@@ -264,29 +264,29 @@ What caught all of this was not cleverness. It was discipline. Decision records 
 Two honest gaps remain, and glossing them would be its own kind of mock data.
 
 !!! warning "We could not run on the real phone until the last morning"
-Almost all of this was built on a Mac. The database had no prebuilt package for the
-phone and compiled from source for the better part of an hour, and the full system
-did not run on the actual Pixel 10 until the dawn of the Sonoma test. We made a
-season of decisions we could only confirm in the final hour.
+    Almost all of this was built on a Mac. The database had no prebuilt package for the
+    phone and compiled from source for the better part of an hour, and the full system
+    did not run on the actual Pixel 10 until the dawn of the Sonoma test. We made a
+    season of decisions we could only confirm in the final hour.
 
 !!! warning "The frontend still needs a pass"
-The driver-facing app was fully designed, and at the track we started wiring it to the
-live backend for real, screen by screen. Most screens still had mock or partial data
-when we arrived. Track Walk, Pre-Brief, the HUD, Pit Stall: we swapped stubs for
-live `/session/...` calls and SSE as the bridge came up, not in one flip. By evening
-the flows that mattered for the session read real data; the rest stayed honest about
-what was not wired yet. The data flows now. What is left is the UX: some screens still
-need work before what the driver sees is as trustworthy as the numbers behind it. A
-pretty screen over shaky data is worse than no screen, so this is the part we will not
-rush.
+    The driver-facing app was fully designed, and at the track we started wiring it to the
+    live backend for real, screen by screen. Most screens still had mock or partial data
+    when we arrived. Track Walk, Pre-Brief, the HUD, Pit Stall: we swapped stubs for
+    live `/session/...` calls and SSE as the bridge came up, not in one flip. By evening
+    the flows that mattered for the session read real data; the rest stayed honest about
+    what was not wired yet. The data flows now. What is left is the UX: some screens still
+    need work before what the driver sees is as trustworthy as the numbers behind it. A
+    pretty screen over shaky data is worse than no screen, so this is the part we will not
+    rush.
 
 !!! quote "From the pitwall — Aileen Villanueva"
-I want to be honest about what "trust the commit" actually looked like. Taha did the
-heavy lifting on the architecture. I was constantly checking in with him to make sure
-we were on the right track, and he was always available. I wasn't part of the early
-bridge tests; I had the meetings and the screen map, but the actual car-side
-constraints didn't hit me until Brian got the data layer working. The pitwall is where
-we truly became a team.
+    I want to be honest about what "trust the commit" actually looked like. Taha did the
+    heavy lifting on the architecture. I was constantly checking in with him to make sure
+    we were on the right track, and he was always available. I wasn't part of the early
+    bridge tests; I had the meetings and the screen map, but the actual car-side
+    constraints didn't hit me until Brian got the data layer working. The pitwall is where
+    we truly became a team.
 
     That day, parts of the app were still mock data when we arrived. We weren't trying to
     hide it, we knew, but mock green screens are just how you ship when you're racing
@@ -315,4 +315,4 @@ The open road needs builders of the organized kind: the ones who read the spec, 
 
 And one blunt note to end on. In the age of AI, yapping has no place. Talk has never been cheaper (a model will hand you infinite confident words for free), so the only scarce thing left is people who can actually build. Learn to build, not to yap. Only the commit counts. The rest is noise.
 
-_Taha Bouhsine on behalf of the Pitwall team._
+*Taha Bouhsine, with Aileen Villanueva (pitwall / frontend), on behalf of the Pitwall team.*
